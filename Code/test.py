@@ -2,13 +2,17 @@ import os
 import torch
 import numpy as np
 from torch.utils.data import DataLoader
-from config import categories, categories_train, dataset, data_path, device_ids, mix_model_path, dict_dir, layer, vMF_kappa, model_save_dir, compnet_type, backbone_type, num_mixtures
+from config import categories, categories_train, dataset, data_path, \
+	device_ids, mix_model_path, dict_dir, layer, vMF_kappa, model_save_dir, compnet_type, backbone_type, num_mixtures
 from config import config as cfg
 from model import Net
-from helpers import getImg, Imgset, imgLoader, getVmfKernels, getCompositionModel, update_clutter_model
+from helpers import getImg, Imgset, imgLoader, getVmfKernels, getCompositionModel, update_clutter_model, UnNormalize
 from model import resnet_feature_extractor
 import tqdm
 import torchvision.models as models
+
+import torchvision
+u = UnNormalize()
 
 ###################
 # Test parameters #
@@ -23,6 +27,7 @@ def test(models, test_data, batch_size):
 	test_loader = DataLoader(dataset=test_data, batch_size=batch_size, shuffle=True)
 	print('Testing')
 	nclasses = models[0].num_classes
+	# print(nclasses)
 	correct = np.zeros(nclasses)
 	total_samples = np.zeros(nclasses)
 	scores = np.zeros((0,nclasses))
@@ -31,6 +36,15 @@ def test(models, test_data, batch_size):
 		for i, data in enumerate(tqdm.tqdm(test_loader)):
 			input,mask, label = data
 			input.requires_grad = False
+
+			# saving images
+			if i%500==0:
+				im = torchvision.transforms.functional.to_pil_image(u(input[0]))
+				# print(type(im))
+				# im.show()
+				im.save('results/revbkg_pixelate4_%s.png' % i)
+				del im
+
 			if device_ids:
 				input = input.cuda(device_ids[0])
 			c_label = label.numpy()
@@ -128,12 +142,13 @@ if __name__ == '__main__':
 
 		for index, occ_type in enumerate(occ_types):
 			# load images
-			test_imgs, test_labels, masks = getImg('test', categories_train, dataset,data_path, categories, occ_level, occ_type,bool_load_occ_mask=True)
+			test_imgs, test_labels, masks = getImg('test', categories_train, dataset,data_path, categories, occ_level, occ_type,bool_load_occ_mask=True)  # masks is empty for some reason
 			print('Total imgs for test of occ_level {} and occ_type {} '.format(occ_level, occ_type) + str(len(test_imgs)))
+			# input()
+			"""test_imgs is list of image path and name strings"""
 			# get image loader
 			test_imgset = Imgset(test_imgs, masks, test_labels, imgLoader, bool_square_images=False)
 			# compute test accuracy
 			acc,scores = test(models=nets, test_data=test_imgset, batch_size=1)
 			out_str = 'Model Name: Occ_level:{}, Occ_type:{}, Acc:{}'.format(occ_level, occ_type, acc)
 			print(out_str)
-

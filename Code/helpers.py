@@ -3,10 +3,14 @@ import torch
 import cv2
 import glob
 import torch.nn.functional as F
-from Code.config import vc_num, categories, occ_types_vmf, occ_types_bern
-from Code.vMFMM import *
+from config import vc_num, categories, occ_types_vmf, occ_types_bern
+from vMFMM import *
 from torchvision import transforms
 from PIL import Image
+
+from imagecorruptions import corrupt
+import numpy as np
+from random import randrange
 
 
 def update_clutter_model(net,device_ids,compnet_type='vmf'):
@@ -150,7 +154,8 @@ def myresize(img, dim, tp):
 
 	return cv2.resize(img, (0, 0), fx=ratio, fy=ratio)
 
-def getImg(mode,categories, dataset, data_path, cat_test=None, occ_level='ZERO', occ_type=None, bool_load_occ_mask = False):
+def getImg(mode,categories, dataset, data_path, cat_test=None, occ_level='ZERO', occ_type=None, \
+	bool_load_occ_mask = False):
 
 	if mode == 'train':
 		train_imgs = []
@@ -220,7 +225,8 @@ def getImg(mode,categories, dataset, data_path, cat_test=None, occ_level='ZERO',
 						if occ_level=='ZERO':
 							img = img_dir + occ_type + '/' + img_path[:-2] + '.JPEG'
 							occ_img1 = []
-							occ_img2 = []
+							# occ_img2 = []
+							occ_img2 = occ_mask_dir_obj + '/' + img_path + '.png'
 						else:
 							img = img_dir + occ_type + '/' + img_path + '.JPEG'
 							if bool_load_occ_mask:
@@ -242,8 +248,11 @@ def getImg(mode,categories, dataset, data_path, cat_test=None, occ_level='ZERO',
 				print('FILELIST NOT FOUND: {}'.format(filelist))
 		return test_imgs, test_labels, occ_imgs
 
-def imgLoader(img_path,mask_path,bool_resize_images=True,bool_square_images=False):
+"""Image corruptions should be added here"""
+def imgLoader(img_path,mask_path,bool_resize_images=True,bool_square_images=False, determinate=False):
+	# determinate = False - do corruptions on images on the fly - adds randomness
 
+	no_occluder = False  # if there is no mask for artificial occluders
 	input_image = Image.open(img_path)
 	if bool_resize_images:
 		if bool_square_images:
@@ -253,8 +262,6 @@ def imgLoader(img_path,mask_path,bool_resize_images=True,bool_square_images=Fals
 			min_size = np.min(sz)
 			if min_size!=224:
 				input_image = input_image.resize((np.asarray(sz) * (224 / min_size)).astype(int),Image.ANTIALIAS)
-	preprocess =  transforms.Compose([transforms.ToTensor(),transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])])
-	img = preprocess(input_image)
 
 	if mask_path[0]:
 		mask1 = cv2.imread(mask_path[0])[:, :, 0]
@@ -269,10 +276,82 @@ def imgLoader(img_path,mask_path,bool_resize_images=True,bool_square_images=Fals
 		except:
 			mask = mask1
 	else:
-		mask = np.ones((img.shape[0], img.shape[1])) * 255.0
+		# mask = np.ones((img.shape[0], img.shape[1])) * 255.0
+		no_occluder = True
+		mask = np.ones((np.array(input_image).shape[0], np.array(input_image).shape[1])) * 255.0
+		# print("ones", mask_path, len(mask_path))
+
+	"""Image Corruptions w/t object mask"""
+	# input_image = Image.fromarray(corrupt(np.array(input_image), \
+	# 	corruption_name='snow', severity=4))
+	# input_image = Image.fromarray(corrupt(np.array(input_image), \
+	# 	corruption_number=randrange(15), severity=randrange(5)+1))
+
+	# input_image.show()
+	"""Image Corruption with mask"""
+	if len(mask_path)>1 and mask_path[1]:
+		try:
+			class_mask_temp = cv2.imread(mask_path[1])[:, :, 0]
+			class_mask = class_mask_temp
+		except TypeError:
+			class_mask = mask
+		# print("pre: ", class_mask.shape)
+		class_mask = myresize(class_mask, 224, 'short')
+		
+		# print("short mask resize: ", class_mask.shape)
+		if class_mask.shape[0]!= np.array(input_image).shape[0] or class_mask.shape[1]!= np.array(input_image).shape[1]:
+			class_mask = cv2.resize(class_mask, (np.array(input_image).shape[1], np.array(input_image).shape[0]))
+			# class_mask = cv2.resize(class_mask, (np.array(input_image).shape[1], 224))
+		# if class_mask.shape[1]!= np.array(input_image).shape[1]:
+		# 	class_mask = cv2.resize(class_mask, (224, np.array(input_image).shape[1]))
+			# class_mask = myresize(class_mask, np.array(input_image).shape[1], 'long')
+		# print("post resize mask: ", class_mask.shape, "image shape", np.array(input_image).shape)
+		# input()
+		
+		############# Specific Corruptions ##############################
+		corrupt_im = corrupt(np.array(input_image), corruption_name='pixelate', severity=4)
+		########## random corruptions ###########################
+		# corrupt_im = corrupt(np.array(input_image), corruption_number=randrange(15), severity=randrange(5)+1)
+		#################################################################
+		########Combining object and occluder mask filtering for corruption#########################
+		# if not no_occluder:
+		# 	try:
+		# 		class_mask = class_mask + mask
+		# 	except ValueError as e:
+		# 		mask = cv2.resize(mask, (class_mask.shape[1], class_mask.shape[0]))
+		# 		class_mask = class_mask + mask
+		# 	class_mask[class_mask>=200] = 255
+		#################################################################
+
+			# l = Image.fromarray(class_mask)
+			# l.show()
+			# input()
+
+		try:
+			corrupt_im = corrupt_im.copy()
+			# corrupt_im[class_mask==255] = 0
+			corrupt_im[class_mask!=255] = 0
+		except IndexError:
+			print("IndexError:", np.array(input_image).shape, class_mask.shape)
+		except ValueError as e:
+			print(e)
+			# print(corrupt_im.flags)
+			# corrupt_im.setflags(write=1)
+			# corrupt_im = corrupt_im.copy()
+			# corrupt_im[class_mask==255] = 0
+		for_gnd = np.array(input_image)
+		# for_gnd[class_mask!=255] = 0
+		for_gnd[class_mask!=255] = 1
+		input_image = Image.fromarray(corrupt_im+for_gnd)
+		# input_image.show()
+		# input()
 
 	mask = torch.from_numpy(mask)
-	return img,mask
+
+	preprocess =  transforms.Compose([transforms.ToTensor(),transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])])
+	img = preprocess(input_image)
+	# print(img.shape)
+	return img, mask
 
 class Imgset():
 	def __init__(self, imgs, masks, labels, loader,bool_square_images=False):
@@ -298,3 +377,21 @@ def save_checkpoint(state, filename, is_best):
 		torch.save(state, filename)
 	else:
 		print("=> Validation Accuracy did not improve")
+
+
+class UnNormalize(object):
+    def __init__(self, mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]):
+        self.mean = mean
+        self.std = std
+
+    def __call__(self, tensor):
+        """
+        Args:
+            tensor (Tensor): Tensor image of size (C, H, W) to be normalized.
+        Returns:
+            Tensor: Normalized image.
+        """
+        for t, m, s in zip(tensor, self.mean, self.std):
+            t.mul_(s).add_(m)
+            # The normalize code -> t.sub_(m).div_(s)
+        return tensor

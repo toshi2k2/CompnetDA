@@ -1,0 +1,7 @@
+data/
+models/
+result*/
+
+*.pyc
+.vscode
+*.pth

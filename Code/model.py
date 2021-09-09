@@ -2,11 +2,11 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torchvision.models as models
-from Code.lib import ops
-from Code.config import device_ids, occ_types_vmf, occ_types_bern
-from Code.helpers import imgLoader
+from lib import ops
+from config import device_ids, occ_types_vmf, occ_types_bern
+from helpers import imgLoader
 import glob
-from Code.vMFMM import *
+from vMFMM import *
 
 
 class ActivationLayer(nn.Module):
