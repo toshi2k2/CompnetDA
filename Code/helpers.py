@@ -1,10 +1,11 @@
+from genericpath import exists
 import os
 import torch
 import cv2
 import glob
 import torch.nn.functional as F
-from config import vc_num, categories, occ_types_vmf, occ_types_bern
-from vMFMM import *
+from Code.config import vc_num, categories, occ_types_vmf, occ_types_bern
+from Code.vMFMM import *
 from torchvision import transforms
 from PIL import Image
 
@@ -155,7 +156,10 @@ def myresize(img, dim, tp):
 	return cv2.resize(img, (0, 0), fx=ratio, fy=ratio)
 
 def getImg(mode,categories, dataset, data_path, cat_test=None, occ_level='ZERO', occ_type=None, \
-	bool_load_occ_mask = False):
+	bool_load_occ_mask = False, determinate=False, corruption=None): 
+	#* determinate = True # for using fixed corrupted dataset - only for pascal3d and no occlusion
+	#* corruption = type of corruption used - cannot be one for determinate = True
+	assert(determinate and (corruption is not None) or not determinate and (corruption is None))
 
 	if mode == 'train':
 		train_imgs = []
@@ -166,6 +170,11 @@ def getImg(mode,categories, dataset, data_path, cat_test=None, occ_level='ZERO',
 				if occ_level == 'ZERO':
 					filelist = data_path + 'pascal3d+_occ/' + category + '_imagenet_train' + '.txt'
 					img_dir = data_path + 'pascal3d+_occ/TRAINING_DATA/' + category + '_imagenet'
+				if determinate is True:
+					corr_img_dir = data_path + 'pascal3d+_occ_' + corruption + '/TRAINING_DATA/' + category + '_imagenet'
+					if (not os.path.exists(corr_img_dir) or len(os.listdir(corr_img_dir))==0):
+						corrupt_img_create(img_dir, corr_img_dir, corruption)
+					img_dir = corr_img_dir
 			elif dataset == 'coco':
 				if occ_level == 'ZERO':
 					img_dir = data_path +'coco_occ/{}_zero'.format(category)
@@ -200,6 +209,13 @@ def getImg(mode,categories, dataset, data_path, cat_test=None, occ_level='ZERO',
 			if dataset == 'pascal3d+':
 				filelist = data_path + 'pascal3d+_occ/' + category + '_imagenet_occ.txt'
 				img_dir = data_path + 'pascal3d+_occ/' + category + 'LEVEL' + occ_level
+				
+				if determinate is True:
+					corr_img_dir = data_path + 'pascal3d+_occ_' + corruption + '/' + category + 'LEVEL' + occ_level
+					if (not os.path.exists(corr_img_dir) or len(os.listdir(corr_img_dir))==0):
+						corrupt_img_create(img_dir, corr_img_dir, corruption)
+					img_dir = corr_img_dir
+
 				if bool_load_occ_mask:
 					if  occ_type=='':
 						occ_mask_dir = data_path + 'pascal3d+_occ/' + category + 'LEVEL' + occ_level+'_mask_object'
@@ -249,7 +265,7 @@ def getImg(mode,categories, dataset, data_path, cat_test=None, occ_level='ZERO',
 		return test_imgs, test_labels, occ_imgs
 
 """Image corruptions should be added here"""
-def imgLoader(img_path,mask_path,bool_resize_images=True,bool_square_images=False, determinate=False):
+def imgLoader(img_path,mask_path,bool_resize_images=True,bool_square_images=False, determinate=True):
 	# determinate = False - do corruptions on images on the fly - adds randomness
 
 	no_occluder = False  # if there is no mask for artificial occluders
@@ -281,70 +297,71 @@ def imgLoader(img_path,mask_path,bool_resize_images=True,bool_square_images=Fals
 		mask = np.ones((np.array(input_image).shape[0], np.array(input_image).shape[1])) * 255.0
 		# print("ones", mask_path, len(mask_path))
 
-	"""Image Corruptions w/t object mask"""
-	# input_image = Image.fromarray(corrupt(np.array(input_image), \
-	# 	corruption_name='snow', severity=4))
-	# input_image = Image.fromarray(corrupt(np.array(input_image), \
-	# 	corruption_number=randrange(15), severity=randrange(5)+1))
+	if determinate == False:
+		"""Image Corruptions w/t object mask"""
+		# input_image = Image.fromarray(corrupt(np.array(input_image), \
+		# 	corruption_name='snow', severity=4))
+		# input_image = Image.fromarray(corrupt(np.array(input_image), \
+		# 	corruption_number=randrange(15), severity=randrange(5)+1))
 
-	# input_image.show()
-	"""Image Corruption with mask"""
-	if len(mask_path)>1 and mask_path[1]:
-		try:
-			class_mask_temp = cv2.imread(mask_path[1])[:, :, 0]
-			class_mask = class_mask_temp
-		except TypeError:
-			class_mask = mask
-		# print("pre: ", class_mask.shape)
-		class_mask = myresize(class_mask, 224, 'short')
-		
-		# print("short mask resize: ", class_mask.shape)
-		if class_mask.shape[0]!= np.array(input_image).shape[0] or class_mask.shape[1]!= np.array(input_image).shape[1]:
-			class_mask = cv2.resize(class_mask, (np.array(input_image).shape[1], np.array(input_image).shape[0]))
-			# class_mask = cv2.resize(class_mask, (np.array(input_image).shape[1], 224))
-		# if class_mask.shape[1]!= np.array(input_image).shape[1]:
-		# 	class_mask = cv2.resize(class_mask, (224, np.array(input_image).shape[1]))
-			# class_mask = myresize(class_mask, np.array(input_image).shape[1], 'long')
-		# print("post resize mask: ", class_mask.shape, "image shape", np.array(input_image).shape)
-		# input()
-		
-		############# Specific Corruptions ##############################
-		corrupt_im = corrupt(np.array(input_image), corruption_name='pixelate', severity=4)
-		########## random corruptions ###########################
-		# corrupt_im = corrupt(np.array(input_image), corruption_number=randrange(15), severity=randrange(5)+1)
-		#################################################################
-		########Combining object and occluder mask filtering for corruption#########################
-		# if not no_occluder:
-		# 	try:
-		# 		class_mask = class_mask + mask
-		# 	except ValueError as e:
-		# 		mask = cv2.resize(mask, (class_mask.shape[1], class_mask.shape[0]))
-		# 		class_mask = class_mask + mask
-		# 	class_mask[class_mask>=200] = 255
-		#################################################################
-
-			# l = Image.fromarray(class_mask)
-			# l.show()
-			# input()
-
-		try:
-			corrupt_im = corrupt_im.copy()
-			# corrupt_im[class_mask==255] = 0
-			corrupt_im[class_mask!=255] = 0
-		except IndexError:
-			print("IndexError:", np.array(input_image).shape, class_mask.shape)
-		except ValueError as e:
-			print(e)
-			# print(corrupt_im.flags)
-			# corrupt_im.setflags(write=1)
-			# corrupt_im = corrupt_im.copy()
-			# corrupt_im[class_mask==255] = 0
-		for_gnd = np.array(input_image)
-		# for_gnd[class_mask!=255] = 0
-		for_gnd[class_mask!=255] = 1
-		input_image = Image.fromarray(corrupt_im+for_gnd)
 		# input_image.show()
-		# input()
+		"""Image Corruption with mask"""
+		if len(mask_path)>1 and mask_path[1]:
+			try:
+				class_mask_temp = cv2.imread(mask_path[1])[:, :, 0]
+				class_mask = class_mask_temp
+			except TypeError:
+				class_mask = mask
+			# print("pre: ", class_mask.shape)
+			class_mask = myresize(class_mask, 224, 'short')
+			
+			# print("short mask resize: ", class_mask.shape)
+			if class_mask.shape[0]!= np.array(input_image).shape[0] or class_mask.shape[1]!= np.array(input_image).shape[1]:
+				class_mask = cv2.resize(class_mask, (np.array(input_image).shape[1], np.array(input_image).shape[0]))
+				# class_mask = cv2.resize(class_mask, (np.array(input_image).shape[1], 224))
+			# if class_mask.shape[1]!= np.array(input_image).shape[1]:
+			# 	class_mask = cv2.resize(class_mask, (224, np.array(input_image).shape[1]))
+				# class_mask = myresize(class_mask, np.array(input_image).shape[1], 'long')
+			# print("post resize mask: ", class_mask.shape, "image shape", np.array(input_image).shape)
+			# input()
+			
+			############# Specific Corruptions ##############################
+			corrupt_im = corrupt(np.array(input_image), corruption_name='pixelate', severity=4)
+			########## random corruptions ###########################
+			# corrupt_im = corrupt(np.array(input_image), corruption_number=randrange(15), severity=randrange(5)+1)
+			#################################################################
+			########Combining object and occluder mask filtering for corruption#########################
+			# if not no_occluder:
+			# 	try:
+			# 		class_mask = class_mask + mask
+			# 	except ValueError as e:
+			# 		mask = cv2.resize(mask, (class_mask.shape[1], class_mask.shape[0]))
+			# 		class_mask = class_mask + mask
+			# 	class_mask[class_mask>=200] = 255
+			#################################################################
+
+				# l = Image.fromarray(class_mask)
+				# l.show()
+				# input()
+
+			try:
+				corrupt_im = corrupt_im.copy()
+				# corrupt_im[class_mask==255] = 0
+				corrupt_im[class_mask!=255] = 0
+			except IndexError:
+				print("IndexError:", np.array(input_image).shape, class_mask.shape)
+			except ValueError as e:
+				print(e)
+				# print(corrupt_im.flags)
+				# corrupt_im.setflags(write=1)
+				# corrupt_im = corrupt_im.copy()
+				# corrupt_im[class_mask==255] = 0
+			for_gnd = np.array(input_image)
+			# for_gnd[class_mask!=255] = 0
+			for_gnd[class_mask!=255] = 1
+			input_image = Image.fromarray(corrupt_im+for_gnd)
+			# input_image.show()
+			# input()
 
 	mask = torch.from_numpy(mask)
 
@@ -395,3 +412,21 @@ class UnNormalize(object):
             t.mul_(s).add_(m)
             # The normalize code -> t.sub_(m).div_(s)
         return tensor
+
+def corrupt_img_create(img_dir, corrupted_dir, corruption):
+	print("creating corrupted image dataset for {}".format(corruption))
+	os.makedirs(corrupted_dir, exist_ok=True)
+	print(img_dir)
+	for file in os.listdir(img_dir):
+		# print(file)
+		if file.endswith(".JPEG"):
+			filepath = os.path.join(img_dir, file)
+			input_image = Image.open(filepath)
+			try:
+				corrupt_im = corrupt(np.array(input_image), corruption_name=corruption, severity=4)
+			except AttributeError as e:
+				print(e, file, img_dir)
+				continue
+			fullOutPath = os.path.join(corrupted_dir, file)
+			Image.fromarray(corrupt_im).save(fullOutPath)
+	return

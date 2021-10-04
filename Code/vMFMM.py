@@ -6,6 +6,8 @@ else:
     from scipy.special import logsumexp
 import time
 
+#? Should try fuzzy/xmeans/kmeans with PCA/meanshift algorithm - should dbscan or density based clustering better for noisy data?
+
 def normalize_features(features):
 	'''features: n by d matrix'''
 	assert(len(features.shape)==2)
@@ -14,20 +16,20 @@ def normalize_features(features):
 
 class vMFMM:
 	def __init__(self, cls_num, init_method = 'random'):
-		self.cls_num = cls_num
+		self.cls_num = cls_num # 512- vc_num
 		self.init_method = init_method
 
 
 	def fit(self, features, kappa, max_it=300, tol = 5e-5, normalized=False, verbose=True):
-		self.features = features
+		self.features = features #* [512] element size, total size=24601600
 		if not normalized:
 			self.features = normalize_features(features)
 
 		self.n, self.d = self.features.shape
-		self.kappa = kappa
+		self.kappa = kappa #/ What is this?
 
 		self.pi = np.random.random(self.cls_num)
-		self.pi /= np.sum(self.pi)
+		self.pi /= np.sum(self.pi) #/ pi nows sums to one - membership of each vc?
 		if self.init_method =='random':
 			self.mu = np.random.random((self.cls_num, self.d))
 			self.mu = normalize_features(self.mu)
@@ -38,24 +40,25 @@ class vMFMM:
 			if self.n > 50000:
 				rdn_index = np.random.choice(self.n, size=(50000,), replace=False)
 			else:
-				rdn_index = np.array(range(self.n), dtype=int)
+				rdn_index = np.array(range(self.n), dtype=int)  #* (48050, )
+			
+			#* COSINE DISTANCE
+			cos_dis = 1-np.dot(self.features[rdn_index], self.features[rdn_index].T) #* [48050, 48050]
 
-			cos_dis = 1-np.dot(self.features[rdn_index], self.features[rdn_index].T)
-
-			centers_i.append(np.random.choice(rdn_index))
-			centers.append(self.features[centers_i[0]])
+			centers_i.append(np.random.choice(rdn_index)) # chooses a value between 0 and 48050
+			centers.append(self.features[centers_i[0]]) #* center initialized with a randomly chosen feature
 			for i in range(self.cls_num-1):
 
 				cdisidx = [np.where(rdn_index==cci)[0][0] for cci in centers_i]
-				prob = np.min(cos_dis[:,cdisidx], axis=1)**2
+				prob = np.min(cos_dis[:,cdisidx], axis=1)**2 #? what's this?
 				prob /= np.sum(prob)
 				centers_i.append(np.random.choice(rdn_index, p=prob))
 				centers.append(self.features[centers_i[-1]])
 
-			self.mu = np.array(centers)
+			self.mu = np.array(centers) #* [512, 512] i.e. 512 1D features of length 512
 			del(cos_dis)
 
-		self.mllk_rec = []
+		self.mllk_rec = [] #/ IS THIS MAXIMUM LIKELIHOOD?
 		for itt in range(max_it):
 			_st = time.time()
 			self.e_step()

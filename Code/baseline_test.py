@@ -1,3 +1,7 @@
+import os, sys
+
+p = os.path.abspath('.')
+sys.path.insert(1, p)
 import torch
 import numpy as np
 from torch.utils.data import DataLoader
@@ -35,7 +39,7 @@ def test(models, test_data, batch_size):
 				im = torchvision.transforms.functional.to_pil_image(u(input[0]))
 				# print(type(im))
 				# im.show()
-				im.save('results/rbkg_pixelate4_%s.png' % i)
+				im.save('results/4checksnow_%s.png' % i)
 				del im
 
 			if device_ids:
@@ -83,7 +87,7 @@ if __name__ == '__main__':
 
 	model.load_state_dict(load_dict['state_dict'])
 
-	model.cuda().eval() # IS THIS NEEDED?
+	model.cuda().eval() #* IS THIS NEEDED?
 
 	############################
 	# Test Loop
@@ -100,7 +104,18 @@ if __name__ == '__main__':
 
 		for index, occ_type in enumerate(occ_types):
 			# load images
-			test_imgs, test_labels, masks = getImg('test', categories_train, dataset,data_path, categories, occ_level, occ_type,bool_load_occ_mask=True)
+			test_imgs, test_labels, masks = getImg('test', categories_train, dataset,data_path, \
+				categories, occ_level, occ_type,bool_load_occ_mask=True, determinate=True, corruption='snow')
+			#* removing an image due to errors
+			errs = ['data/pascal3d+_occ_snow/carLEVELONE/n03770679_14513_2.JPEG', 'data/pascal3d+_occ_snow/carLEVELFIVE/n03770679_14513_2.JPEG', 'data/pascal3d+_occ_snow/carLEVELNINE/n03770679_14513_2.JPEG']
+			for es in errs:
+				if es in test_imgs:
+					idx_rm = test_imgs.index(es)
+					del test_imgs[idx_rm]
+					del test_labels[idx_rm]
+					del masks[idx_rm]
+			#*
+
 			print('Total imgs for test of occ_level {} and occ_type {} '.format(occ_level, occ_type) + str(len(test_imgs)))
 			"""test_imgs is list of image path and name strings"""
 			# get image loader

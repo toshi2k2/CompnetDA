@@ -1,14 +1,24 @@
+import os, sys
+p = os.path.abspath('.')
+sys.path.insert(1, p)
 from Code.vMFMM import *
-from config_initialization import vc_num, dataset, categories, data_path, cat_test, device_ids, Astride, Apad, Arf, vMF_kappa, layer,init_path, nn_type, dict_dir, offset, extractor
-from Code.helpers import getImg, imgLoader, Imgset, myresize
+from config_initialization import vc_num, dataset, categories, data_path, cat_test, device_ids, \
+	Astride, Apad, Arf, vMF_kappa, layer,init_path, nn_type, dict_dir, offset, extractor, \
+		da_dict_dir
+from Code.helpers import UnNormalize, getImg, imgLoader, Imgset, myresize, UnNormalize
 import torch
+import torchvision
 from torch.utils.data import DataLoader
 import cv2
 import glob
 import pickle
-import os
 
-img_per_cat = 1000
+u = UnNormalize()
+
+DA = True
+corr = 'pixelate' # 'snow'
+
+img_per_cat = 1000 # image per category
 samp_size_per_img = 20
 imgs_par_cat =np.zeros(len(categories))
 bool_load_existing_cluster = False
@@ -16,7 +26,14 @@ bins = 4
 
 occ_level = 'ZERO'
 occ_type = ''
-imgs, labels, masks = getImg('train', categories, dataset, data_path, cat_test, occ_level, occ_type, bool_load_occ_mask=False)
+
+#* imgs is the image paths array/list
+if DA:
+	imgs, labels, masks = getImg('train', categories, dataset, data_path, cat_test, \
+		occ_level, occ_type, bool_load_occ_mask=False, determinate=True, corruption=corr)
+else:
+	imgs, labels, masks = getImg('train', categories, dataset, data_path, cat_test, \
+	occ_level, occ_type, bool_load_occ_mask=False)
 imgset = Imgset(imgs, masks, labels, imgLoader, bool_square_images=False)
 data_loader = DataLoader(dataset=imgset, batch_size=1, shuffle=False)
 nimgs = len(imgs)
@@ -28,29 +45,32 @@ for ii,data in enumerate(data_loader):
 	input, mask, label = data
 	if np.mod(ii,500)==0:
 		print('{} / {}'.format(ii,len(imgs)))
+		im = torchvision.transforms.functional.to_pil_image(u(input[0]))
+		im.save('results/vmf_cluster.png')
+		del im
 
 	fname = imgs[ii]
 	category = labels[ii]
 
 	if imgs_par_cat[label]<img_per_cat:
 		with torch.no_grad():
-			tmp = extractor(input.cuda(device_ids[0]))[0].detach().cpu().numpy()
-		height, width = tmp.shape[1:3]
+			tmp = extractor(input.cuda(device_ids[0]))[0].detach().cpu().numpy() # ends with Conv2d, Relu and MaxPool2D - [512, 7, 22]
+		height, width = tmp.shape[1:3] # 7, 22
 		img = cv2.imread(imgs[ii])
 
-		tmp = tmp[:,offset:height - offset, offset:width - offset]
-		gtmp = tmp.reshape(tmp.shape[0], -1)
+		tmp = tmp[:,offset:height - offset, offset:width - offset] #* taking a central crop [512, 1, 16]
+		gtmp = tmp.reshape(tmp.shape[0], -1) # [512, 16] - 2D to 1D per channel
 		if gtmp.shape[1] >= samp_size_per_img:
 			rand_idx = np.random.permutation(gtmp.shape[1])[:samp_size_per_img]
 		else:
 			rand_idx = np.random.permutation(gtmp.shape[1])[:samp_size_per_img - gtmp.shape[1]]
 			#rand_idx = np.append(range(gtmp.shape[1]), rand_idx)
-		tmp_feats = gtmp[:, rand_idx].T
+		tmp_feats = gtmp[:, rand_idx].T  # [4, 512] - randomly chosen 4 spatial points?
 
 		cnt = 0
 		for rr in rand_idx:
-			ihi, iwi = np.unravel_index(rr, (height - 2 * offset, width - 2 * offset))
-			hi = (ihi+offset)*(input.shape[2]/height)-Apad
+			ihi, iwi = np.unravel_index(rr, (height - 2 * offset, width - 2 * offset)) # unravel 1D to 2D - rr is the 1D location
+			hi = (ihi+offset)*(input.shape[2]/height)-Apad #* seems like x,y position calculation - why?
 			wi = (iwi + offset)*(input.shape[3]/width)-Apad
 			#hi = Astride * (ihi + offset) - Apad
 			#wi = Astride * (iwi + offset) - Apad
@@ -59,21 +79,25 @@ for ii,data in enumerate(data_loader):
 			#assert (wi >= 0)
 			#assert (hi <= img.shape[0] - Arf)
 			#assert (wi <= img.shape[1] - Arf)
-			loc_set.append([category, ii, hi,wi,hi+Arf,wi+Arf])
-			feat_set.append(tmp_feats[cnt,:])
+			loc_set.append([category, ii, hi,wi,hi+Arf,wi+Arf]) #* Arf is receptive field size - this is defining a rectangle patch?
+			feat_set.append(tmp_feats[cnt,:]) #* element is size 512, - appends single spatial point feature for a single image from VGG16
 			cnt+=1
 
 		imgs_par_cat[label]+=1
 
 
-feat_set = np.asarray(feat_set)
-loc_set = np.asarray(loc_set).T
+feat_set = np.asarray(feat_set) #* [48050, 512]
+loc_set = np.asarray(loc_set).T #* [6, 48050]
 
 print(feat_set.shape)
-model = vMFMM(vc_num, 'k++')
+model = vMFMM(vc_num, 'k++') #* k-means clustering - finding means and saving them in a pickle file
 model.fit(feat_set, vMF_kappa, max_it=150)
-with open(dict_dir+'dictionary_{}_{}.pickle'.format(layer,vc_num), 'wb') as fh:
-	pickle.dump(model.mu, fh)
+if DA:
+	with open(da_dict_dir+'dictionary_{}_{}.pickle'.format(layer,vc_num), 'wb') as fh:
+		pickle.dump(model.mu, fh)
+else:
+	with open(dict_dir+'dictionary_{}_{}.pickle'.format(layer,vc_num), 'wb') as fh:
+		pickle.dump(model.mu, fh)
 
 
 num = 50
@@ -88,13 +112,20 @@ for vc_i in range(vc_num):
 		tmp.append(iloc)
 	SORTED_LOC.append(tmp)
 
-with open(dict_dir + 'dictionary_{}_{}_p.pickle'.format(layer,vc_num), 'wb') as fh:
-	pickle.dump(model.p, fh)
+if DA:
+	with open(da_dict_dir + 'dictionary_{}_{}_p.pickle'.format(layer,vc_num), 'wb') as fh:
+		pickle.dump(model.p, fh)
+else:
+	with open(dict_dir + 'dictionary_{}_{}_p.pickle'.format(layer,vc_num), 'wb') as fh:
+		pickle.dump(model.p, fh)
 p = model.p
 
 print('save top {0} images for each cluster'.format(num))
 example = [None for vc_i in range(vc_num)]
-out_dir = dict_dir + '/cluster_images_{}_{}/'.format(layer,vc_num)
+if DA:
+	out_dir = da_dict_dir + '/cluster_images_{}_{}/'.format(layer,vc_num)
+else:
+	out_dir = dict_dir + '/cluster_images_{}_{}/'.format(layer,vc_num)
 if not os.path.exists(out_dir):
 	os.makedirs(out_dir)
 

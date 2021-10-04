@@ -38,6 +38,18 @@ if not os.path.exists(dict_dir):
 
 sim_dir = init_path+'similarity_{}_{}_{}/'.format(nn_type,layer,dataset)
 
+#* Dirs for domain adapted feature data
+da_init_path = model_save_dir+'da_init_{}/'.format(nn_type)
+if not os.path.exists(da_init_path):
+	os.makedirs(da_init_path)
+
+da_dict_dir = da_init_path+'dictionary_{}/'.format(nn_type)
+if not os.path.exists(da_dict_dir):
+	os.makedirs(da_dict_dir)
+
+da_sim_dir = da_init_path+'similarity_{}_{}_{}/'.format(nn_type,layer,dataset)
+#* ############################################
+
 Astride_set = [2, 4, 8, 16, 32]  # stride size
 featDim_set = [64, 128, 256, 512, 512]  # feature dimension
 Arf_set = [6, 16, 44, 100, 212]  # receptive field size

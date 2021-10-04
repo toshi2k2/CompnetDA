@@ -186,10 +186,20 @@ def finalize_configs(is_training: bool):
         'dictionary_{}'.format(_C.MODEL.BACKBONE_TYPE)
     _C.DATA.DICT_DIR = _C.DATA.DICT_PATH / \
         'dictionary_{}.pickle'.format(_C.MODEL.LAYER)
-
     _C.DATA.MIX_MODEL_PATH = _C.DATA.INIT_PATH / \
         'mix_model_{}_{}_EM_all/'.format(_C.MODEL.COMPNET_TYPE,
                                          'pascal3d+')
+###################
+    _C.DATA.DA_INIT_PATH = _C.DATA.MODEL_DIR / \
+        'da_init_{}'.format(_C.MODEL.BACKBONE_TYPE)
+    _C.DATA.DA_DICT_PATH = _C.DATA.DA_INIT_PATH / \
+        'dictionary_{}'.format(_C.MODEL.BACKBONE_TYPE)
+    _C.DATA.DA_DICT_DIR = _C.DATA.DA_DICT_PATH / \
+        'dictionary_{}.pickle'.format(_C.MODEL.LAYER)
+    _C.DATA.DA_MIX_MODEL_PATH = _C.DATA.DA_INIT_PATH / \
+        'mix_model_{}_{}_EM_all/'.format(_C.MODEL.COMPNET_TYPE,
+                                         'pascal3d+')
+###################
     if _C.GPUS is None:
         _C.GPUS = list(range(torch.cuda.device_count()))
 
@@ -237,6 +247,11 @@ def old_fashioned_config(cfg: AttrDict):
     categories = cfg.DATA.CATEGORY
     categories_train = cfg.DATA.CATEGORY_TRAIN
     dict_dir = cfg.DATA.DICT_DIR
+
+    da_init_path = cfg.DATA.DA_INIT_PATH
+    da_mix_model_path = cfg.DATA.DA_MIX_MODEL_PATH
+    da_dict_path = cfg.DATA.DA_DICT_PATH
+    da_dict_dir = cfg.DATA.DA_DICT_DIR
 
     # Return all local variables as a dict
     ret = locals()

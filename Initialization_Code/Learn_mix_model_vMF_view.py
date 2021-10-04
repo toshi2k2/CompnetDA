@@ -1,9 +1,13 @@
+import os, sys
+p = os.path.abspath('.')
+sys.path.insert(1, p)
 from sklearn.cluster import SpectralClustering
 from scipy.spatial.distance import cdist
-import os
 import pickle
 import numpy as np
-from config_initialization import vc_num, dataset, categories, data_path, cat_test, device_ids, Astride, Apad, Arf,vMF_kappa, layer,init_path, dict_dir, sim_dir, extractor, model_save_dir
+from config_initialization import vc_num, dataset, categories, data_path, \
+	cat_test, device_ids, Astride, Apad, Arf,vMF_kappa, layer,init_path, \
+		dict_dir, sim_dir, extractor, model_save_dir, da_dict_dir, da_init_path
 from Code.helpers import getImg, imgLoader, Imgset
 from torch.utils.data import DataLoader
 import cv2
@@ -11,7 +15,14 @@ import gc
 import matplotlib.pyplot as plt
 import scipy.io as sio
 
-dictfile=dict_dir+'dictionary_{}_{}.pickle'.format(layer,vc_num)
+DA = False
+mode = 'mixed'
+# corr = 'pixelate' # 'snow'
+
+if DA or mode == 'mixed':
+	dictfile=da_dict_dir+'dictionary_{}_{}.pickle'.format(layer,vc_num)
+else:
+	dictfile=dict_dir+'dictionary_{}_{}.pickle'.format(layer,vc_num)
 print('loading {}'.format(dictfile))
 with open(dictfile, 'rb') as fh:
 	centers = pickle.load(fh)
@@ -21,8 +32,12 @@ with open(dictfile, 'rb') as fh:
 bool_pytroch = True
 bool_plot_view_p3d=False
 
-mixdir = init_path + 'mix_model_vmf_{}_EM_all/'.format(dataset)
+if DA or mode == 'mixed':
+	mixdir = da_init_path + 'mix_model_vmf_{}_EM_all/'.format(dataset)
+else:
+	mixdir = init_path + 'mix_model_vmf_{}_EM_all/'.format(dataset)
 if not os.path.exists(mixdir):
+	print("creating mix dir ", mixdir)
 	os.makedirs(mixdir)
 occ_level='ZERO'
 occ_type=''
@@ -31,16 +46,20 @@ spectral_split_thresh=0.1
 
 def learn_mix_model_vMF(category,num_layers = 2,num_clusters_per_layer = 2,frac_data=1.0):
 
-	imgs, labels, masks = getImg('train', [category], dataset, data_path, cat_test, occ_level, occ_type, bool_load_occ_mask=False)
+	imgs, labels, masks = getImg('train', [category], dataset, data_path, cat_test, \
+		occ_level, occ_type, bool_load_occ_mask=False)
 	# similarity matrix
-	sim_fname = model_save_dir+'init_vgg/'+'similarity_vgg_pool4/'+'simmat_mthrh045_{}_K{}.pickle'.format(category, 512)
-
+	if DA or mode == 'mixed':
+		sim_fname = model_save_dir+'da_init_vgg/'+'similarity_vgg_pool5_pascal3d+/'+'simmat_mthrh045_{}_K{}.pickle'.format(category, 512)	
+	else:
+		sim_fname = model_save_dir+'init_vgg/'+'similarity_vgg_pool4/'+'simmat_mthrh045_{}_K{}.pickle'.format(category, 512)
+	print("sim_fname:", sim_fname)
 	# Spectral clustering based on the similarity matrix
 	with open(sim_fname, 'rb') as fh:
 		mat_dis1, _ = pickle.load(fh)
 
 	mat_dis = mat_dis1
-	subN = np.int(mat_dis.shape[0]*frac_data)
+	subN = int(mat_dis.shape[0]*frac_data)
 	mat_dis = mat_dis[:subN,:subN]
 	print('total number of instances for obj {}: {}'.format(category, subN))
 	N=subN
