@@ -16,8 +16,8 @@ import matplotlib.pyplot as plt
 import scipy.io as sio
 
 DA = False
-mode = 'mixed'
-# corr = 'pixelate' # 'snow'
+mode = None #'' # mixed
+corr = 'snow'
 
 if DA or mode == 'mixed':
 	dictfile=da_dict_dir+'dictionary_{}_{}.pickle'.format(layer,vc_num)
@@ -45,14 +45,22 @@ spectral_split_thresh=0.1
 
 
 def learn_mix_model_vMF(category,num_layers = 2,num_clusters_per_layer = 2,frac_data=1.0):
-
-	imgs, labels, masks = getImg('train', [category], dataset, data_path, cat_test, \
-		occ_level, occ_type, bool_load_occ_mask=False)
+	
+	if DA and mode != 'mixed':
+		print("Loading corrupted data")
+		imgs, labels, masks = getImg('train', [category], dataset, data_path, cat_test, \
+			occ_level, occ_type, bool_load_occ_mask=False, determinate=True, corruption=corr)
+	else:
+		print("Loading clean data")
+		imgs, labels, masks = getImg('train', [category], dataset, data_path, cat_test, \
+			occ_level, occ_type, bool_load_occ_mask=False)
 	# similarity matrix
 	if DA or mode == 'mixed':
+		print("loading DA similarity matrix")
 		sim_fname = model_save_dir+'da_init_vgg/'+'similarity_vgg_pool5_pascal3d+/'+'simmat_mthrh045_{}_K{}.pickle'.format(category, 512)	
 	else:
-		sim_fname = model_save_dir+'init_vgg/'+'similarity_vgg_pool4/'+'simmat_mthrh045_{}_K{}.pickle'.format(category, 512)
+		# sim_fname = model_save_dir+'init_vgg/'+'similarity_vgg_pool4/'+'simmat_mthrh045_{}_K{}.pickle'.format(category, 512)
+		sim_fname = model_save_dir+'init_vgg/'+'similarity_vgg_pool5_pascal3d+/'+'simmat_mthrh045_{}_K{}.pickle'.format(category, 512)
 	print("sim_fname:", sim_fname)
 	# Spectral clustering based on the similarity matrix
 	with open(sim_fname, 'rb') as fh:

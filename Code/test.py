@@ -18,9 +18,9 @@ import torchvision.models as models
 import torchvision
 u = UnNormalize()
 
-DA = True
-test_orig = False  #* test original compnets without corrupted images
-corr = 'pixelate' # 'snow'
+DA = False
+test_orig = True  #* test compnets with clean images
+corr = 'snow'  # 'snow'
 
 ###################
 # Test parameters #
@@ -49,8 +49,8 @@ def test(models, test_data, batch_size):
             # saving images
             # if i%500==0:
             #     im = torchvision.transforms.functional.to_pil_image(u(input[0]))
-            #     print(type(im))
-            #     im.show()
+                # print(type(im), input.shape)
+                # im.show()
             #     # im.save('results/1elas4_%s.png' % i)
             #     del im
                 # exit()
@@ -59,7 +59,11 @@ def test(models, test_data, batch_size):
                 input = input.cuda(device_ids[0])
             c_label = label.numpy()
 
+            # try:
             output, *_ = models[0](input)
+            # except RuntimeError as e:
+            #     print(e, input.shape)
+            #     continue
             out = output.cpu().numpy()
 
             scores = np.concatenate((scores, out))
@@ -174,8 +178,6 @@ if __name__ == '__main__':
             if test_orig == False:
                 test_imgs, test_labels, masks = getImg('test', categories_train, dataset,data_path, \
                     categories, occ_level, occ_type,bool_load_occ_mask=True, determinate=True, corruption=corr)  # masks is empty for some reason
-                # test_imgs, test_labels, masks = getImg('train', categories_train, dataset,data_path, \
-                #     categories, occ_level, occ_type,bool_load_occ_mask=True, determinate=True, corruption=corr)
             else:
                 test_imgs, test_labels, masks = getImg('test', categories_train, dataset,data_path, \
                     categories, occ_level, occ_type,bool_load_occ_mask=True)  # masks is empty for some reason

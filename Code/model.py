@@ -220,6 +220,9 @@ class PointwiseInferenceLayer(nn.Module):
                 'Unknown compnet_type: {}'.format(self.compnet_type))
         # Reshape the foreground to (n_batch, n_class, n_mixture, 1, height,
         # width)
+        # print(foreground.shape,self.num_classes,self.num_mixtures)
+        # assert(self.num_classes==12)
+        # self.num_classes=12
         foreground = foreground.reshape((-1, self.num_classes,
                                          self.num_mixtures, 1,
                                          *foreground.shape[2:]))
