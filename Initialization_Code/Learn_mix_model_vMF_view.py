@@ -16,7 +16,7 @@ import matplotlib.pyplot as plt
 import scipy.io as sio
 
 DA = False
-mode = None #'' # mixed
+mode = None # '', mixed, None
 corr = 'snow'
 
 if DA or mode == 'mixed':
@@ -164,6 +164,10 @@ def learn_mix_model_vMF(category,num_layers = 2,num_clusters_per_layer = 2,frac_
 						idx_tmp=IMAGEIDX_SUB[k][cluster_result == ff]
 						if len(idx_tmp)>0.02*N:
 							FINAL_CLUSTER_ASSIGNMENT.append(np.array(idx_tmp))
+						elif len(idx_tmp)>1:
+							FINAL_CLUSTER_ASSIGNMENT.append(np.array(idx_tmp))
+						else:
+							raise RuntimeError("Cluster has no data")
 			elif len(idx)>0.02*N:
 				FINAL_CLUSTER_ASSIGNMENT.append(np.array(IMAGEIDX[i][parent_counter])[idx])
 				LABELS_SUB.append([])
@@ -259,7 +263,10 @@ def learn_mix_model_vMF(category,num_layers = 2,num_clusters_per_layer = 2,frac_
 
 		if changed/subN<0.01:
 			break
-
+		if len(alpha) < num_layers*num_clusters_per_layer:
+			print(len(alpha))
+			raise RuntimeError("Not enough mixtures")
+	
 	'''
 	# write images of clusters
 	'''
