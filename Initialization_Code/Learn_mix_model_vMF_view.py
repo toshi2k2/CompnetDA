@@ -148,8 +148,9 @@ def learn_mix_model_vMF(category,num_layers = 2,num_clusters_per_layer = 2,frac_
 		for k in range(np.power(num_clusters_per_layer,i)):
 			parent_counter 	= int(np.floor(k / num_clusters_per_layer))
 			leaf_counter	= int(np.mod(k,num_clusters_per_layer))
-			idx = np.where(LABELS[i][parent_counter] == leaf_counter)[0]
-			if len(idx)>spectral_split_thresh*N:
+			idx = np.where(LABELS[i][parent_counter] == leaf_counter)[0] #! ??
+			# if len(idx)>spectral_split_thresh*N:
+			if len(idx)>0.02*N: #! To catch the loop going to the elif condition
 				mat_sim_sub = MAT[i][parent_counter][np.ix_(idx, idx)] # subsample similarity matrix
 				MAT_SUB.append(mat_sim_sub)
 				IMAGEIDX_SUB.append(np.array(IMAGEIDX[i][parent_counter])[idx])
@@ -169,7 +170,7 @@ def learn_mix_model_vMF(category,num_layers = 2,num_clusters_per_layer = 2,frac_
 						else:
 							raise RuntimeError("Cluster has no data")
 			elif len(idx)>0.02*N:
-				FINAL_CLUSTER_ASSIGNMENT.append(np.array(IMAGEIDX[i][parent_counter])[idx])
+				FINAL_CLUSTER_ASSIGNMENT.append(np.array(IMAGEIDX[i][parent_counter])[idx]) #! this appends the last cluster - doesn't take care of additional cluster requirements
 				LABELS_SUB.append([])
 				IMAGEIDX_SUB.append([])
 				MAT_SUB.append([])
