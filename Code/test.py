@@ -18,9 +18,11 @@ import torchvision.models as models
 import torchvision
 u = UnNormalize()
 
-DA = False
-test_orig = True  #* test compnets with clean images
-corr = 'snow'  # 'snow'
+DA = True
+test_orig = False  #* test compnets with clean images
+corr = 'glass_blur'  # 'snow'
+
+print("{} Corruption Model is {} and clean test data is {}".format(corr, DA, test_orig))
 
 ###################
 # Test parameters #
@@ -105,6 +107,7 @@ if __name__ == '__main__':
         else:
             vc_dir = model_save_dir+'compnet_{}_{}_{}_initialization/'.format(layer,\
                 compnet_type,likely,dataset)
+        print("VD Dir: ", vc_dir)
         vc_path = ''
         outdir = vc_dir
 
@@ -132,10 +135,14 @@ if __name__ == '__main__':
     extractor.cuda(device_ids[0]).eval()
 
     if DA:
+        print("Loading: ", da_dict_dir)
+        print("Loading: ", da_mix_model_path)
         weights = getVmfKernels(da_dict_dir, device_ids)
         mix_models = getCompositionModel(device_ids, da_mix_model_path, layer, categories_train, \
                                          compnet_type=compnet_type, num_mixtures=num_mixtures)
     else:
+        print("Loading: ", dict_dir)
+        print("Loading: ", mix_model_path)
         weights = getVmfKernels(dict_dir, device_ids)
         mix_models = getCompositionModel(device_ids, mix_model_path, layer, categories_train,\
             compnet_type=compnet_type,num_mixtures=num_mixtures)
@@ -176,17 +183,19 @@ if __name__ == '__main__':
         for index, occ_type in enumerate(occ_types):
             # load images
             if test_orig == False:
+                print("Loading corrupted data")
                 test_imgs, test_labels, masks = getImg('test', categories_train, dataset,data_path, \
                     categories, occ_level, occ_type,bool_load_occ_mask=True, determinate=True, corruption=corr)  # masks is empty for some reason
             else:
+                print("Loading Clean data")
                 test_imgs, test_labels, masks = getImg('test', categories_train, dataset,data_path, \
                     categories, occ_level, occ_type,bool_load_occ_mask=True)  # masks is empty for some reason
             print('Total imgs for test of occ_level {} and occ_type {} '.format(occ_level, occ_type) + str(len(test_imgs)))
             # input()
-            if corr == 'snow':
-                errs = ['data/pascal3d+_occ_snow/carLEVELONE/n03770679_14513_2.JPEG', 'data/pascal3d+_occ_snow/carLEVELFIVE/n03770679_14513_2.JPEG', 'data/pascal3d+_occ_snow/carLEVELNINE/n03770679_14513_2.JPEG']
+            if DA is True and occ_level != 'ZERO':
+                errs = ["data/pascal3d+_occ_{}/carLEVEL{}/n03770679_14513_2.JPEG".format(corr, occ_level)]
+                # errs = ['data/pascal3d+_occ_snow/carLEVELONE/n03770679_14513_2.JPEG', 'data/pascal3d+_occ_snow/carLEVELFIVE/n03770679_14513_2.JPEG', 'data/pascal3d+_occ_snow/carLEVELNINE/n03770679_14513_2.JPEG']
             else:
-                # errs = ['data/pascal3d+_occ_elastic_transform/carLEVELONE/n03770679_14513_2.JPEG', 'data/pascal3d+_occ_elastic_transform/carLEVELFIVE/n03770679_14513_2.JPEG', 'data/pascal3d+_occ_elastic_transform/carLEVELNINE/n03770679_14513_2.JPEG']
                 errs = []
             for es in errs:
                 if es in test_imgs:

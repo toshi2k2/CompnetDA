@@ -15,8 +15,8 @@ import pickle
 
 u = UnNormalize()
 
-DA = False
-corr = 'pixelate'  # 'snow'
+DA = True
+corr = 'glass_blur'  # 'snow'
 
 img_per_cat = 1000  # image per category
 samp_size_per_img = 20

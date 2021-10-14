@@ -15,9 +15,9 @@ import numpy as np
 import math
 import torch
 
-DA = False
-corr = 'snow'  # 'snow'
-mode = None  # * mixed: vc- corrupted, mixture - clean; '': vc and mix - corrupted;reverse:
+DA = True
+corr = 'glass_blur'  # 'snow'
+mode = 'mixed'  # * mixed: vc- corrupted, mixture - clean; '': vc and mix - corrupted;reverse:
            # * reverse: vc-clean, mix-corrupt; None
 paral_num = 10
 nimg_per_cat = 5000

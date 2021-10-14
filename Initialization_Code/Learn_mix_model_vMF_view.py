@@ -15,9 +15,9 @@ import gc
 import matplotlib.pyplot as plt
 import scipy.io as sio
 
-DA = False
-mode = None # '', mixed, None
-corr = 'snow'
+DA = True
+mode = 'mixed' # '', mixed, None
+corr = 'glass_blur'
 
 if DA or mode == 'mixed':
 	dictfile=da_dict_dir+'dictionary_{}_{}.pickle'.format(layer,vc_num)
