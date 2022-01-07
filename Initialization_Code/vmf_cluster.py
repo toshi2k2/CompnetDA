@@ -1,3 +1,5 @@
+#! Taking bigger spatial size for VCs
+
 import os, sys
 p = os.path.abspath('.')
 sys.path.insert(1, p)
@@ -18,8 +20,10 @@ u = UnNormalize()
 DA = False#True
 corr = None#'snow'  # 'snow'
 backgnd_corr = None # backgnd corruption - if None corr will be applied to entire image
-# cat  = [robin_cats[4]]
+# cat  = [robin_cats[4]] #/ for individual sub-cats
 cat = None
+# offset = 2 #/ should
+vc_space = 3
 
 img_per_cat = 1000  # image per category
 samp_size_per_img = 20
@@ -70,18 +74,82 @@ for ii, data in enumerate(data_loader):
         height, width = tmp.shape[1:3]  # 7, 22
         img = cv2.imread(imgs[ii])
 
-        tmp = tmp[:,offset:height - offset, offset:width - offset]  # * taking a central crop [512, 1, 16]
+        if vc_space in [2,3]:
+            tmp2 = np.array(tmp)
+
+        s1, s2 = height - 2*offset, width - 2*offset
+        l, r = [], []
+        if s1<1:
+            if s2<1:
+                continue
+                tmp = tmp[:,offset-1:offset, offset:offset+1]
+                l, r = [offset-1,offset], [offset,offset+1]
+            else:
+                continue
+                tmp = tmp[:,offset-1:offset, offset:width - offset]
+                l, r = [offset-1,offset], [offset,width - offset]
+        elif s2<1:
+            continue
+            tmp = tmp[:,offset:height - offset, offset:offset+1]
+            l, r = [offset,height - offset], [offset,offset+1]
+        else:
+            tmp = tmp[:,offset:height - offset, offset:width - offset]  # * taking a central crop [512, 1, 16]
+            l, r = [offset,height - offset], [offset,width - offset]
         gtmp = tmp.reshape(tmp.shape[0], -1) # [512, 16] - 2D to 1D per channel
+        # continue
         if gtmp.shape[1] >= samp_size_per_img:
             rand_idx = np.random.permutation(gtmp.shape[1])[:samp_size_per_img]
         else:
             rand_idx = np.random.permutation(gtmp.shape[1])[:samp_size_per_img - gtmp.shape[1]]
             # rand_idx = np.append(range(gtmp.shape[1]), rand_idx)
         tmp_feats = gtmp[:, rand_idx].T  # [4, 512] - randomly chosen 4 spatial points?
+        patches = []
+        #/ Calculating bigger spatial VC feature patches
+        if vc_space == 3:
+            tmp2 = tmp2[:, l[0]-1:l[1]+1, r[0]-1:r[1]+1] #/ Taking +2 colums and rows around tmp for a 3x3 window
+            for rr in rand_idx:
+                if l[1]-l[0]==1:
+                    feat_patch = tmp2[:, :, rr:3+rr]
+                elif r[1]-r[0]==1:
+                    feat_patch = tmp2[:, rr:3+rr, :]
+                else:
+                    raise(RuntimeError)
+                feat_patch = feat_patch.reshape(feat_patch.shape[0]*9, -1)
+                patches.append(feat_patch)
+            patches = np.asarray(patches)
+            tmp_feats2 = patches.reshape(patches.shape[0],-1)
+        if vc_space == 2:
+            # if s1==1 and s2==1:
+            #     print(s1,s2)
+            if r[1]-r[0]==1:
+                tmp2 = tmp2[:,offset-1:(height+1) - offset, offset:width - offset]
+            elif l[1]-l[0]==1:
+                tmp2 = tmp2[:,offset:height - offset, offset-1:(width+1) - offset]
+            gtmp2 = tmp2.reshape(tmp2.shape[0], -1) # [512, 16] - 2D to 1D per channel
+            tmp_feats2 = gtmp2[:, rand_idx+1]
+            tmp_feats2pre = gtmp2[:, rand_idx]
+            tmp_feats2post = gtmp2[:, rand_idx+2]
+            # print((tmp_feats-tmp_feats2.T).sum())
+            # print((tmp_feats-tmp_feats2pre.T).sum())
+            assert(np.array_equal(tmp_feats, tmp_feats2.T))
+            tmp_feats2 = np.concatenate((tmp_feats2, tmp_feats2pre, tmp_feats2post)).T
 
+        # if tmp.shape[1]!=3 or tmp.shape[2]<3:
+        # if tmp.shape[1]<1 or tmp.shape[2]<1:
+        #     print(tmp.shape, height, width, gtmp.shape, s1)
+        #     print(rand_idx)
+        #     print(tmp_feats)
+        # continue
         cnt = 0
         for rr in rand_idx:
-            ihi, iwi = np.unravel_index(rr, (height - 2 * offset, width - 2 * offset)) # unravel 1D to 2D - rr is the 1D location
+            if s1==0:
+                ihi, iwi = np.unravel_index(rr, (1, width - 2 * offset))
+                if s2==0:
+                    ihi, iwi = np.unravel_index(rr, (1, 1))
+            elif s2==0:
+                ihi, iwi = np.unravel_index(rr, (height - 2 * offset, 1))
+            else:
+                ihi, iwi = np.unravel_index(rr, (height - 2 * offset, width - 2 * offset)) # unravel 1D to 2D - rr is the 1D location
             hi = (ihi+offset)*(input.shape[2]/height)-Apad  # * seems like x,y position calculation - why?
             wi = (iwi + offset)*(input.shape[3]/width)-Apad
             # hi = Astride * (ihi + offset) - Apad
@@ -92,11 +160,14 @@ for ii, data in enumerate(data_loader):
             # assert (hi <= img.shape[0] - Arf)
             # assert (wi <= img.shape[1] - Arf)
             loc_set.append([category, ii, hi, wi, hi+Arf, wi+Arf])  # * Arf is receptive field size - this is defining a rectangle patch?
-            feat_set.append(tmp_feats[cnt, :])  # * element is size 512, - appends single spatial point feature for a single image from VGG16
+            if vc_space in [2,3]:
+                feat_set.append(tmp_feats2[cnt, :])    
+            else:
+                feat_set.append(tmp_feats[cnt, :])  # * element is size 512, - appends single spatial point feature for a single image from VGG16
             cnt += 1
 
         imgs_par_cat[label] += 1
-
+# exit()
 
 feat_set = np.asarray(feat_set)  # * [48050, 512]
 loc_set = np.asarray(loc_set).T  # * [6, 48050]

@@ -31,7 +31,7 @@ class ActivationLayer(nn.Module):
 
 class Net(nn.Module):
     def __init__(self, backbone, weights, vMF_kappa, occ_likely, mix_model,
-                 bool_mixture_bg, compnet_type, num_mixtures, vc_thresholds):
+                 bool_mixture_bg, compnet_type, num_mixtures, vc_thresholds, vc_sp=0):
         super(Net, self).__init__()
         self.backbone = backbone
         self.occ_likely = occ_likely
@@ -40,7 +40,7 @@ class Net(nn.Module):
         self.num_classes = mix_model.shape[0]//num_mixtures
         self.mix_model = torch.nn.Parameter(mix_model)
         self.use_mixture_bg = bool_mixture_bg
-        self.conv1o1 = Conv1o1Layer(weights)
+        self.conv1o1 = Conv1o1Layer(weights, vc_neigh=vc_sp)
         self.activation_layer = ActivationLayer(vMF_kappa, compnet_type,
                                                 threshold=vc_thresholds)
 
@@ -209,7 +209,8 @@ class PointwiseInferenceLayer(nn.Module):
         # n_class, n_mixture, height, width)
         if self.compnet_type == 'vmf':
             foreground = torch.log(
-                (input.unsqueeze(1) * mm).sum(2) * (1 - occ_likely) + 1e-10)
+                (input.unsqueeze(1) * mm).sum(2) * (1 - occ_likely) + 1e-10) # suming over 3-D tensor - individual contribution of each vc per pixel location
+        # mm is mixture model
         elif self.compnet_type == 'bernoulli':
             obj_zero = torch.log(1.0-torch.exp(mm))
             foreground = ((input.unsqueeze(1) * mm) +
@@ -393,12 +394,48 @@ def resnet_feature_extractor(type, layer='last'):
 
 
 class Conv1o1Layer(nn.Module):
-    def __init__(self, weights):
+    def __init__(self, weights, vc_neigh=0):
         super(Conv1o1Layer, self).__init__()
-        self.weight = nn.Parameter(weights)
+        self.weight = nn.Parameter(weights) #/ VC's, maybe?
+        self.vc_neigh = vc_neigh
+    
+    def input_reshape(self, x):
+        new_arr = torch.zeros((x.shape[0], x.shape[1]*9, x.shape[2], x.shape[3])).to(device_ids[0])
+        x_ = nn.functional.pad(x, (1, 1, 1, 1), mode='replicate') 
+        for i in np.arange(1,x_.shape[2]-1):
+            for j in np.arange(1,x_.shape[3]-1):
+                t = x_[:, :, i-1:i+2,j-1:j+2]
+                assert(torch.equal(x[:,:,i-1,j-1],t[:,:,1,1]))
+                t = t.reshape(t.shape[0], t.shape[1]*9, -1)
+                new_arr[:,:,i-1,j-1]=t[:,:,0]
+        return new_arr
+    
+    def input_reshape2(self, x):
+        # layer_feature = np.pad(layer_feature)
+        # new_arr = np.zeros((layer_feature.shape[0]*9, layer_feature.shape[1], layer_feature.shape[2]))
+        y = x.data.cpu().numpy()
+        if self.vc_neigh==3: ds = 9
+        elif self.vc_neigh==2: ds = 3
+        else: raise(RuntimeError)
+        x_ = np.pad(y, ((0,0), (0, 0), (1, 1), (1, 1)), mode='edge') 
+        x.resize_(x.shape[0],x.shape[1]*ds,x.shape[2],x.shape[3])
+        for i in np.arange(1,x_.shape[2]-1):
+            for j in np.arange(1,x_.shape[3]-1):
+                if self.vc_neigh==3:
+                    t = x_[:,:,i-1:i+2,j-1:j+2]
+                elif self.vc_neigh==2:
+                    t = x_[:,:,i-1:i+2,:]
+                t = t.reshape(t.shape[0],t.shape[1]*ds,-1)
+                # print(t.shape, x[:,:,i-1,j-1].shape, t[:,:,0].shape)
+                # exit()
+                x[:,:,i-1,j-1]=torch.from_numpy(t[:,:,0])
+        return x
 
     def forward(self, x):
         weight = self.weight
+        if self.vc_neigh > 0:
+            # weight = weight[:,0:512,:,:]
+            x = self.input_reshape2(x)
         xnorm = torch.norm(x, dim=1, keepdim=True)
         boo_zero = (xnorm == 0).type(torch.FloatTensor).to(device_ids[0])
         xnorm = xnorm + boo_zero

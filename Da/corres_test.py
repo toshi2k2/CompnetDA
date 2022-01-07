@@ -1,45 +1,32 @@
-import os, sys
+""""Testing with DA correspondence VCs"""
 
+import os, sys
 p = os.path.abspath('.')
 sys.path.insert(1, p)
 import torch
 import numpy as np
 from torch.utils.data import DataLoader
-from config import categories, categories_train, dataset, data_path, \
+from Code.config import categories, categories_train, dataset, data_path, \
     device_ids, mix_model_path, dict_dir, layer, vMF_kappa, model_save_dir, \
         compnet_type, backbone_type, num_mixtures, da_mix_model_path, da_dict_dir
-from config import config as cfg
-from model import Net
-from helpers import getImg, Imgset, imgLoader, getVmfKernels, getCompositionModel, update_clutter_model, UnNormalize
-from model import resnet_feature_extractor
+from Code.config import config as cfg
+from Code.model import Net
+from Code.helpers import getImg, Imgset, imgLoader, getVmfKernels, getCompositionModel, update_clutter_model, UnNormalize
+from Code.model import resnet_feature_extractor
 import tqdm
 import torchvision.models as models
-from Initialization_Code.config_initialization import robin_cats
 
 import torchvision
 u = UnNormalize()
 
-if dataset == 'robin':
-    categories_train.remove('bottle')
-    categories = categories_train
-    # cat = [robin_cats[4]]
-    cat = None
-    print("Testing Sub-Category(ies) {}\n".format(cat))
-else:
-    cat = None
-
-DA = False#True
-test_orig = True#False  #* test compnets with clean images
-corr = None#'snow'  # 'snow'
-vc_space = 0#2,3 # default=0
-
-backbone_type = 'vgg_bn' #'vgg_bn
-da_dict_dir = 'models/da_init_vgg_bn/dictionary_vgg_bn/dictionary_pool5_512.pickle'
-da_mix_model_path = 'models/da_init_{}/mix_model_vmf_{}_EM_all'.format(backbone_type,dataset)
-dict_dir = 'models/init_{}/dictionary_{}/dictionary_pool5_512.pickle'.format(backbone_type,backbone_type)
-# dict_dir = 'models_old/init_{}/dictionary_{}/dictionary_pool5.pickle'.format(backbone_type,backbone_type)
-mix_model_path = 'models/init_{}/mix_model_vmf_{}_EM_all'.format(backbone_type,dataset)
+DA = True
+test_orig = False  #* test compnets with clean images
+corr = 'snow'  # 'snow'
 # da_dict_dir = 'models/da_init_vgg/dictionary_vgg/corres_dict_pool5_512.pickle'
+# mix_model_path = 'models_clean/init_vgg/mix_model_vmf_pascal3d+_EM_all'
+# mix_model_path = 'models/da_init_vgg/mix_model_vmf_pascal3d+_EM_all'
+da_dict_dir = 'models/da_init_vgg_tr/dictionary_vgg_tr/corres_dict_pool5_512.pickle'
+mix_model_path = 'models/da_init_vgg_tr/mix_model_vmf_pascal3d+_EM_all'
 
 print("{} Corruption Model is {} and clean test data is {}".format(corr, DA, test_orig))
 
@@ -48,8 +35,6 @@ print("{} Corruption Model is {} and clean test data is {}".format(corr, DA, tes
 ###################
 likely = 0.6  # occlusion likelihood
 occ_levels = ['ZERO', 'ONE', 'FIVE', 'NINE'] # occlusion levels to be evaluated [0%,20-40%,40-60%,60-80%]
-if dataset == 'robin':
-    occ_levels = ['ZERO']
 bool_load_pretrained_model = False # False if you want to load initialization (see Initialization_Code/)
 bool_mixture_model_bg = False 	# use maximal mixture model or sum of all mixture models, not so important
 bool_multi_stage_model = False 	# this is an old setup
@@ -59,7 +44,6 @@ def test(models, test_data, batch_size):
     test_loader = DataLoader(dataset=test_data, batch_size=batch_size, shuffle=True)
     print('Testing')
     nclasses = models[0].num_classes
-    # print(nclasses)
     correct = np.zeros(nclasses)
     total_samples = np.zeros(nclasses)
     scores = np.zeros((0,nclasses))
@@ -82,20 +66,16 @@ def test(models, test_data, batch_size):
                 input = input.cuda(device_ids[0])
             c_label = label.numpy()
 
-            # try:
             output, *_ = models[0](input)
-            # except RuntimeError as e:
-            #     print(e, input.shape)
-            #     continue
             out = output.cpu().numpy()
 
             scores = np.concatenate((scores, out))
             out = out.argmax(1)
             correct[c_label] += np.sum(out == c_label)
-            if out!= c_label and c_label == 5:
-                im = torchvision.transforms.functional.to_pil_image(u(input[0]))
-                im.save('results/fails/car_incorrect_%s_%s.png' % (corr, i))
-                del im
+            # if out!= c_label and c_label == 5:
+            #     im = torchvision.transforms.functional.to_pil_image(u(input[0]))
+            #     im.save('results/fails/car_incorrect_%s_%s.png' % (corr, i))
+            #     del im
 
             total_samples[c_label] += 1
 
@@ -112,7 +92,7 @@ if __name__ == '__main__':
 
     if bool_load_pretrained_model:
         print(">>>>>>>>>>>>> LOADING Pre-Trained Model")
-        if backbone_type=='vgg' or 'vgg_tr':
+        if backbone_type=='vgg':
             if layer=='pool5':
                 if dataset=='pascal3d+':
                     vc_dir = model_save_dir+'vgg_pool5_p3d+/'
@@ -121,23 +101,16 @@ if __name__ == '__main__':
 
         vc_file = vc_dir + 'best.pth'
         outdir = vc_dir
-        # vc_file = model_save_dir + 'train_pool5_a3_b3_vcTrue_mixTrue_occlikely0.6_vc512_lr_0.01_pascal3d+_pretrainedFalse_epochs_50_occFalse_backbonevgg_0/vc9.pth'
-        vc_file = model_save_dir + 'train_pool5_a0_b0_vcTrue_mixTrue_occlikely0.6_vc512_lr_0.0001_pascal3d+_pretrainedFalse_epochs_50_occFalse_backbonevgg_tr_0/vc2.pth'
-    else:
-        if DA:
-            vc_dir = model_save_dir+'da_compnet_{}_{}_{}_initialization/'.format(layer,\
-                compnet_type,likely,dataset)
-        else:
-            vc_dir = model_save_dir+'compnet_{}_{}_{}_initialization/'.format(layer,\
-                compnet_type,likely,dataset)
-        print("VD Dir: ", vc_dir)
-        vc_path = ''
-        outdir = vc_dir
-
-    # if not os.path.exists(outdir):
-    #     print("creating :", outdir)
-    #     os.makedirs(outdir)
-    # info = outdir + 'config.txt'
+    # else:
+    #     if DA:
+    #         vc_dir = model_save_dir+'da_compnet_{}_{}_{}_initialization/'.format(layer,\
+    #             compnet_type,likely,dataset)
+    #     else:
+    #         vc_dir = model_save_dir+'compnet_{}_{}_{}_initialization/'.format(layer,\
+    #             compnet_type,likely,dataset)
+    #     print("VD Dir: ", vc_dir)
+    #     vc_path = ''
+    #     outdir = vc_dir
 
     occ_likely = []
     for i in range(len(categories_train)):
@@ -151,46 +124,20 @@ if __name__ == '__main__':
             extractor = models.vgg16(pretrained=True).features[0:24]
         else:
             extractor = models.vgg16(pretrained=True).features
-    elif backbone_type=='vgg_bn':
-        if layer=='pool4':
-            extractor = models.vgg16_bn(pretrained=True).features[0:24]
-        else:
-            extractor = models.vgg16_bn(pretrained=True).features
-    elif backbone_type =='vgg_tr':
-        saved_model = 'baseline_models/train_None_lr_0.01_pascal3d+_pretrained_False_epochs_15_occ_False_backbonevgg_0/vgg14.pth'
-        # saved_model = 'baseline_models/snowadaptedvggbn.pth' # adapted vgg_bn
-        saved_model = 'baseline_models/None_adapted_vgg_bn_robin.pth' # adapted vgg_bn for robin
-        load_dict = torch.load(saved_model, map_location='cuda:{}'.format(0))
-        # tmp = models.vgg16(pretrained=False)
-        tmp = models.vgg16_bn(pretrained=False)
-        num_ftrs = tmp.classifier[6].in_features
-        tmp.classifier[6] = torch.nn.Linear(num_ftrs, len(categories_train))
-        tmp.load_state_dict(load_dict['state_dict'])
-        tmp.eval()
-        if layer=='pool4':
-            extractor = tmp.features[0:24]
-        else:
-            extractor = tmp.features
     elif backbone_type=='resnet50' or backbone_type == 'resnet18' or backbone_type == 'resnext' \
         or backbone_type=='densenet':
         extractor = resnet_feature_extractor(backbone_type, layer)
 
     extractor.cuda(device_ids[0]).eval()
 
-    if DA:
-        print("Loading: ", da_dict_dir)
-        print("Loading: ", da_mix_model_path)
-        weights = getVmfKernels(da_dict_dir, device_ids)
-        mix_models = getCompositionModel(device_ids, da_mix_model_path, layer, categories_train, \
-                                         compnet_type=compnet_type, num_mixtures=num_mixtures)
-    else:
-        print("Loading: ", dict_dir)
-        print("Loading: ", mix_model_path)
-        weights = getVmfKernels(dict_dir, device_ids)
-        mix_models = getCompositionModel(device_ids, mix_model_path, layer, categories_train,\
-            compnet_type=compnet_type,num_mixtures=num_mixtures)
+    print("Loading: ", da_dict_dir)
+    print("Loading: ", mix_model_path)
+
+    weights = getVmfKernels(da_dict_dir, device_ids)
+    mix_models = getCompositionModel(device_ids, mix_model_path, layer, categories_train,\
+        compnet_type=compnet_type,num_mixtures=num_mixtures)
     net = Net(extractor, weights, vMF_kappa, occ_likely, mix_models, bool_mixture_bg=bool_mixture_model_bg,\
-        compnet_type=compnet_type, num_mixtures=num_mixtures, vc_thresholds=cfg.MODEL.VC_THRESHOLD, vc_sp=vc_space)
+        compnet_type=compnet_type, num_mixtures=num_mixtures, vc_thresholds=cfg.MODEL.VC_THRESHOLD)
     if device_ids:
         net = net.cuda(device_ids[0])
     nets=[]
@@ -222,22 +169,20 @@ if __name__ == '__main__':
                 occ_types = ['']#['_white','_noise', '_texture', '']
             elif dataset=='coco':
                 occ_types = ['']
-            elif dataset=='robin':
-                occ_types = ['']
 
         for index, occ_type in enumerate(occ_types):
             # load images
             if test_orig == False:
-                print("Loading corrupted test data")
+                print("Loading corrupted data")
                 test_imgs, test_labels, masks = getImg('test', categories_train, dataset,data_path, \
                     categories, occ_level, occ_type,bool_load_occ_mask=True, determinate=True, corruption=corr)  # masks is empty for some reason
             else:
-                print("Loading Clean test data")
+                print("Loading Clean data")
                 test_imgs, test_labels, masks = getImg('test', categories_train, dataset,data_path, \
-                    categories, occ_level, occ_type,bool_load_occ_mask=True, subcat=cat)  # masks is empty for some reason
+                    categories, occ_level, occ_type,bool_load_occ_mask=True)  # masks is empty for some reason
             print('Total imgs for test of occ_level {} and occ_type {} '.format(occ_level, occ_type) + str(len(test_imgs)))
             # input()
-            if test_orig is False and occ_level != 'ZERO':
+            if DA is True and occ_level != 'ZERO':
                 errs = ["data/pascal3d+_occ_{}/carLEVEL{}/n03770679_14513_2.JPEG".format(corr, occ_level)]
                 # errs = ['data/pascal3d+_occ_snow/carLEVELONE/n03770679_14513_2.JPEG', 'data/pascal3d+_occ_snow/carLEVELFIVE/n03770679_14513_2.JPEG', 'data/pascal3d+_occ_snow/carLEVELNINE/n03770679_14513_2.JPEG']
             else:

@@ -1,3 +1,5 @@
+# To calculate compsimmat with bigger spatial VCs
+
 import os, sys
 p = os.path.abspath('.')
 sys.path.insert(1, p)
@@ -19,6 +21,8 @@ DA = False#True
 corr = None#'snow'  # 'snow'
 mode = None#'mixed'#'corres'  # * mixed: vc- corrupted, mixture - clean; '': vc and mix - corrupted;reverse:
            # * reverse: vc-clean, mix-corrupt; None, 'corres': correspondence dict b/w clean and corr VCs
+vc_space = 3
+
 paral_num = 10
 nimg_per_cat = 5000
 imgs_par_cat = np.zeros(len(categories))
@@ -72,7 +76,7 @@ for category in categories:  # * loading individual class categories
             imgs, labels, masks = getImg('train', [category], dataset, data_path, cat_test,\
                 occ_level, occ_type, bool_load_occ_mask=False, determinate=True, corruption=corr)
     else:
-        print("Loading clean {} data\n".format(dataset))
+        print("Loading clean data\n")
         imgs, labels, masks = getImg('train', [category], dataset, data_path, cat_test, \
             occ_level, occ_type, bool_load_occ_mask=False)
     imgs = imgs[:nimg_per_cat]
@@ -97,7 +101,25 @@ for category in categories:  # * loading individual class categories
                 with torch.no_grad():
                     layer_feature = extractor(input.cuda(device_ids[0]))[0].detach().cpu().numpy()  # * Feature extration - [512, 7, 22]
                 iheight, iwidth = layer_feature.shape[1:3]  # [7, 22]
-                lff = layer_feature.reshape(layer_feature.shape[0], -1).T  # * 2D to 1D per feature vector [154,512]
+                if vc_space in [2,3]:
+                    if vc_space==3: ds = 9
+                    elif vc_space==2: ds = 3
+                    else: raise(RuntimeError)
+                    # layer_feature = np.pad(layer_feature)
+                    new_arr = np.zeros((layer_feature.shape[0]*ds, layer_feature.shape[1], layer_feature.shape[2]))
+                    x_ = np.pad(layer_feature, ((0, 0), (1, 1), (1, 1)), mode='edge') 
+                    for i in np.arange(1,x_.shape[1]-1):
+                        for j in np.arange(1,x_.shape[2]-1):
+                            if vc_space == 3:
+                                t = x_[:,i-1:i+2,j-1:j+2]
+                            elif vc_space == 2:
+                                t = x_[:,i-1:i+2,:]
+                            t = t.reshape(t.shape[0]*ds, -1)
+                            new_arr[:,i-1,j-1]=t[:,0]
+                    lff = new_arr.reshape(new_arr.shape[0], -1).T
+                    del new_arr, x_
+                else:
+                    lff = layer_feature.reshape(layer_feature.shape[0], -1).T  # * 2D to 1D per feature vector [154,512]
                 lff_norm = lff / (np.sqrt(np.sum(lff ** 2, 1) + 1e-10).reshape(-1, 1)) + 1e-10
                 #/ Calculate cosine distance between image and all vmf kernels/means/centers
                 r_set[ii] = cdist(lff_norm, centers, 'cosine').reshape(iheight, iwidth, -1)   # / [7, 22, 512] - 512 values for each pixel

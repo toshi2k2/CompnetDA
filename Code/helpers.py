@@ -156,9 +156,10 @@ def myresize(img, dim, tp):
 	return cv2.resize(img, (0, 0), fx=ratio, fy=ratio)
 
 def getImg(mode,categories, dataset, data_path, cat_test=None, occ_level='ZERO', occ_type=None, \
-	bool_load_occ_mask = False, determinate=False, corruption=None): 
+	bool_load_occ_mask = False, determinate=False, corruption=None, corr_bck=None, subcat=None): 
 	#* determinate = True # for using fixed corrupted dataset - only for pascal3d and no occlusion
 	#* corruption = type of corruption used - cannot be one for determinate = True
+	#* subcat = subcategory filter in robin dataset
 	assert(determinate and (corruption is not None) or not determinate and (corruption is None))
 
 	if mode == 'train':
@@ -171,37 +172,57 @@ def getImg(mode,categories, dataset, data_path, cat_test=None, occ_level='ZERO',
 					filelist = data_path + 'pascal3d+_occ/' + category + '_imagenet_train' + '.txt'
 					img_dir = data_path + 'pascal3d+_occ/TRAINING_DATA/' + category + '_imagenet'
 				if determinate is True:
-					corr_img_dir = data_path + 'pascal3d+_occ_' + corruption + '/TRAINING_DATA/' + category + '_imagenet'
-					if (not os.path.exists(corr_img_dir) or len(os.listdir(corr_img_dir))==0):
-						corrupt_img_create(img_dir, corr_img_dir, corruption)
+					if corr_bck is None:
+						corr_img_dir = data_path + 'pascal3d+_occ_' + corruption + '/TRAINING_DATA/' + category + '_imagenet'
+						if (not os.path.exists(corr_img_dir) or len(os.listdir(corr_img_dir))==0):
+							corrupt_img_create(img_dir, corr_img_dir, corruption)
+					else:
+						if  occ_type=='':
+							occ_mask_dir = data_path + 'pascal3d+_occ/' + category + 'LEVEL' + occ_level+'_mask_object'
+						else:
+							occ_mask_dir = data_path + 'pascal3d+_occ/' + category + 'LEVEL' + occ_level+'_mask'
+						occ_mask_dir_obj = data_path + 'pascal3d+_occ/0_old_masks/'+category+'_imagenet_occludee_mask/'
+						corr_img_dir = data_path + 'pascal3d+_occ_' + corruption + '-' + corr_bck + '/TRAINING_DATA/' + category + '_imagenet'
+						if (not os.path.exists(corr_img_dir) or len(os.listdir(corr_img_dir))==0):
+							masked_corrupt_img_create(img_dir, corr_img_dir, occ_mask_dir, occ_mask_dir_obj, occ_level, corruption, corr_bck)
 					img_dir = corr_img_dir
 			elif dataset == 'coco':
 				if occ_level == 'ZERO':
 					img_dir = data_path +'coco_occ/{}_zero'.format(category)
 					filelist = data_path +'coco_occ/{}_{}_train.txt'.format(category, occ_level)
+			elif dataset == 'robin':
+				img_dir = './' + data_path + 'Robin/cls_train/{}/'.format(category)
+				img_list = os.listdir(img_dir)
+				img_list = [img_dir + s for s in img_list]
+				train_imgs += img_list
+				label = categories.index(category)
+				train_labels += [label]*len(img_list)
+				train_masks += [False,False]*len(img_list)
 
-			with open(filelist, 'r') as fh:
-				contents = fh.readlines()
-			fh.close()
-			img_list = [cc.strip() for cc in contents]
-			label = categories.index(category)
-			for img_path in img_list:
-				if dataset=='coco':
-					if occ_level == 'ZERO':
-						img = img_dir + '/' + img_path + '.jpg'
+			if dataset in ['pascal3d+','coco']:
+				with open(filelist, 'r') as fh:
+					contents = fh.readlines()
+				fh.close()
+				img_list = [cc.strip() for cc in contents]
+				label = categories.index(category)
+				for img_path in img_list:
+					if dataset=='coco':
+						if occ_level == 'ZERO':
+							img = img_dir + '/' + img_path + '.jpg'
+						else:
+							img = img_dir + '/' + img_path + '.JPEG'
 					else:
 						img = img_dir + '/' + img_path + '.JPEG'
-				else:
-					img = img_dir + '/' + img_path + '.JPEG'
-				occ_img1 = []
-				occ_img2 = []
-				train_imgs.append(img)
-				train_labels.append(label)
-				train_masks.append([occ_img1,occ_img2])
+					occ_img1 = []
+					occ_img2 = []
+					train_imgs.append(img)
+					train_labels.append(label)
+					train_masks.append([occ_img1,occ_img2])
 
 		return train_imgs, train_labels, train_masks
 
 	else:
+		"""Test-time"""
 		test_imgs = []
 		test_labels = []
 		occ_imgs = []
@@ -229,39 +250,58 @@ def getImg(mode,categories, dataset, data_path, cat_test=None, occ_level='ZERO',
 				else:
 					img_dir = data_path+'coco_occ/{}_occ'.format(category)
 					filelist = data_path+'coco_occ/{}_{}.txt'.format(category, occ_level)
+			elif dataset == 'robin':
+				cats = ['context', 'weather', 'texture', 'pose', 'shape']
+				if subcat is None:
+					subcat = cats
+				else: 
+					assert(all(item in cats for item in subcat))
+					# t = []
+					# t.append(subcat)
+					# subcat = t
+				for sc in subcat:
+					img_dir = './' + data_path + 'Robin/cls_test/{}/{}/'.format(category, sc)
+					img_list = os.listdir(img_dir)
+					img_list = [img_dir + s for s in img_list]
+					test_imgs += img_list
+					label = categories.index(category)
+					test_labels += [label]*len(img_list)
+					occ_imgs += [False,False]*len(img_list)
+				#! add sublabels output as well
 
-			if os.path.exists(filelist):
-				with open(filelist, 'r') as fh:
-					contents = fh.readlines()
-				fh.close()
-				img_list = [cc.strip() for cc in contents]
-				label = categories.index(category)
-				for img_path in img_list:
-					if dataset != 'coco':
-						if occ_level=='ZERO':
-							img = img_dir + occ_type + '/' + img_path[:-2] + '.JPEG'
-							occ_img1 = []
-							# occ_img2 = []
-							occ_img2 = occ_mask_dir_obj + '/' + img_path + '.png'
-						else:
-							img = img_dir + occ_type + '/' + img_path + '.JPEG'
-							if bool_load_occ_mask:
-								occ_img1 = occ_mask_dir + '/' + img_path + '.JPEG'
+			if dataset in ['pascal3d+','coco']:
+				if os.path.exists(filelist):
+					with open(filelist, 'r') as fh:
+						contents = fh.readlines()
+					fh.close()
+					img_list = [cc.strip() for cc in contents]
+					label = categories.index(category)
+					for img_path in img_list:
+						if dataset != 'coco':
+							if occ_level=='ZERO':
+								img = img_dir + occ_type + '/' + img_path[:-2] + '.JPEG'
+								occ_img1 = []
+								# occ_img2 = []
 								occ_img2 = occ_mask_dir_obj + '/' + img_path + '.png'
 							else:
-								occ_img1 = []
-								occ_img2 = []
+								img = img_dir + occ_type + '/' + img_path + '.JPEG'
+								if bool_load_occ_mask:
+									occ_img1 = occ_mask_dir + '/' + img_path + '.JPEG'
+									occ_img2 = occ_mask_dir_obj + '/' + img_path + '.png'
+								else:
+									occ_img1 = []
+									occ_img2 = []
 
-					else:
-						img = img_dir + occ_type + '/' + img_path + '.jpg'
-						occ_img1 = []
-						occ_img2 = []
+						else:
+							img = img_dir + occ_type + '/' + img_path + '.jpg'
+							occ_img1 = []
+							occ_img2 = []
 
-					test_imgs.append(img)
-					test_labels.append(label)
-					occ_imgs.append([occ_img1,occ_img2])
-			else:
-				print('FILELIST NOT FOUND: {}'.format(filelist))
+						test_imgs.append(img)
+						test_labels.append(label)
+						occ_imgs.append([occ_img1,occ_img2])
+				else:
+					print('FILELIST NOT FOUND: {}'.format(filelist))
 		return test_imgs, test_labels, occ_imgs
 
 """Image corruptions should be added here"""
@@ -279,23 +319,27 @@ def imgLoader(img_path,mask_path,bool_resize_images=True,bool_square_images=Fals
 			if min_size!=224:
 				input_image = input_image.resize((np.asarray(sz) * (224 / min_size)).astype(int),Image.ANTIALIAS)
 
-	if mask_path[0]:
-		mask1 = cv2.imread(mask_path[0])[:, :, 0]
-		mask1 = myresize(mask1, 224, 'short')
-		try:
-			mask2 = cv2.imread(mask_path[1])[:, :, 0]
-			mask2 = mask2[:mask1.shape[0], :mask1.shape[1]]
-		except:
-			mask = mask1
-		try:
-			mask = ((mask1 == 255) * (mask2 == 255)).astype(np.float)
-		except:
-			mask = mask1
-	else:
-		# mask = np.ones((img.shape[0], img.shape[1])) * 255.0
-		no_occluder = True
-		mask = np.ones((np.array(input_image).shape[0], np.array(input_image).shape[1])) * 255.0
-		# print("ones", mask_path, len(mask_path))
+	try:
+		if mask_path[0]:
+			mask1 = cv2.imread(mask_path[0])[:, :, 0]
+			mask1 = myresize(mask1, 224, 'short')
+			try:
+				mask2 = cv2.imread(mask_path[1])[:, :, 0]
+				mask2 = mask2[:mask1.shape[0], :mask1.shape[1]]
+			except:
+				mask = mask1
+			try:
+				mask = ((mask1 == 255) * (mask2 == 255)).astype(np.float)
+			except:
+				mask = mask1
+		else:
+			# mask = np.ones((img.shape[0], img.shape[1])) * 255.0
+			no_occluder = True
+			mask = np.ones((np.array(input_image).shape[0], np.array(input_image).shape[1])) * 255.0
+			# print("ones", mask_path, len(mask_path))
+	except TypeError as e:
+		if mask_path == False:
+			mask = np.ones((np.array(input_image).shape[0], np.array(input_image).shape[1])) * 255.0
 
 	if determinate == False:
 		"""Image Corruptions w/t object mask"""
@@ -424,6 +468,38 @@ def corrupt_img_create(img_dir, corrupted_dir, corruption):
 			input_image = Image.open(filepath)
 			try:
 				corrupt_im = corrupt(np.array(input_image), corruption_name=corruption, severity=4)
+			except AttributeError as e:
+				print(e, file, img_dir)
+				continue
+			fullOutPath = os.path.join(corrupted_dir, file)
+			Image.fromarray(corrupt_im).save(fullOutPath)
+	return
+
+def masked_corrupt_img_create(img_dir, corrupted_dir, occ_mask_dir, occ_mask_dir_obj, occ_level, for_corr, bck_corr):
+	print("creating corrupted image dataset for foreground {} - bckgnd {}".format(for_corr, bck_corr))
+	os.makedirs(corrupted_dir, exist_ok=True)
+	print(img_dir)
+	for file in os.listdir(img_dir):
+		# print(file)
+		if file.endswith(".JPEG"):
+			filepath = os.path.join(img_dir, file)
+			input_image = Image.open(filepath)
+			# if occ_level=='ZERO':
+			# 	occ_img1 = []
+			# 	occ_img2 = occ_mask_dir_obj + '/' + file[:-5] + '.png'
+			# else:
+			# 	occ_img1 = occ_mask_dir + '/' + file
+			# 	occ_img2 = occ_mask_dir_obj + '/' + file[:-5] + '.png'
+			try:
+				if occ_level != 'ZERO':
+					occ_image1 = Image.open(os.path.join(occ_mask_dir, file))
+				occ_image2 = Image.open(os.path.join(occ_mask_dir_obj, file[:-5] + '.png'))
+				# print(file)
+			except FileNotFoundError as e:
+				print(e, file, img_dir)
+				continue
+			try:
+				corrupt_im = corrupt(np.array(input_image), corruption_name=for_corr, severity=4)
 			except AttributeError as e:
 				print(e, file, img_dir)
 				continue

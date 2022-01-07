@@ -1,6 +1,8 @@
 from model import Net
-from helpers import getImg, Imgset, imgLoader, save_checkpoint,getCompositionModel,getVmfKernels, update_clutter_model
-from config import device_ids, mix_model_path, categories, categories_train, dict_dir, dataset, data_path, layer, vc_num, model_save_dir, compnet_type,backbone_type, vMF_kappa,num_mixtures
+from helpers import getImg, Imgset, imgLoader, save_checkpoint,getCompositionModel,getVmfKernels, \
+	update_clutter_model
+from config import device_ids, mix_model_path, categories, categories_train, dict_dir, dataset, data_path, layer, \
+	vc_num, model_save_dir, compnet_type,backbone_type, vMF_kappa,num_mixtures
 from config import config as cfg
 from torch.utils.data import DataLoader
 from losses import ClusterLoss

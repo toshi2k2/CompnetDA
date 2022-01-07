@@ -85,7 +85,7 @@ _C = config     # short alias to avoid coding
 # Experiment name
 _C.NAME = 'default'
 
-# options: 'pascal3d+', 'mnist', 'cifar10', 'coco'
+# options: 'pascal3d+', 'mnist', 'cifar10', 'coco', 'robin'
 _C.DATA.DATASET = 'pascal3d+'
 # categories for testing (vehicles only)
 _C.DATA.CATEGORY = ['aeroplane', 'bicycle', 'bus', 'car', 'motorbike', 'train']
@@ -97,6 +97,7 @@ _C.DATA.CATEGORY_TRAIN = ['aeroplane', 'bicycle', 'boat', 'bottle', 'bus', 'car'
 _C.DATA.BASE_DIR = PosixPath('data/')#None
 _C.DATA.MODEL_DIR = PosixPath('models/')#None
 #_C.DATA.TENSORBOARD_DIR = None
+_C.DATA.VGG_DIR = PosixPath('baseline_models/')#None
 
 _C.GPUS = None
 
@@ -110,7 +111,7 @@ _C.MODEL.MIXTURE_NUM = 4 # number of mixture models per class
 # 'second' if _C.MODEL.BACKBONE_TYPE is 'resnet50', 'resnext'. None
 # means default layer, i.e. 'pool5' for 'vgg' and 'last' for 'resnet50',
 # 'resnext', 'densenet'.
-_C.MODEL.LAYER = 'pool5'
+_C.MODEL.LAYER = 'pool4'#'pool5'
 # options: 'vgg', 'resnet50', 'resnext'
 _C.MODEL.BACKBONE_TYPE = 'vgg'
 
@@ -252,6 +253,7 @@ def old_fashioned_config(cfg: AttrDict):
     da_mix_model_path = cfg.DATA.DA_MIX_MODEL_PATH
     da_dict_path = cfg.DATA.DA_DICT_PATH
     da_dict_dir = cfg.DATA.DA_DICT_DIR
+    vggmodel_dir = cfg.DATA.VGG_DIR
 
     # Return all local variables as a dict
     ret = locals()

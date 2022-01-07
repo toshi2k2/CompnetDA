@@ -1,6 +1,10 @@
 data/
 models*/
 result*/
+robusta/
+res_sim_corres/
+baseline_models/
+Initialization_Code/rough.ipynb
 
 *.pyc
 .vscode
