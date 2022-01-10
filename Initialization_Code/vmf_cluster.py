@@ -112,6 +112,10 @@ for ii, data in enumerate(data_loader):
                     feat_patch = tmp2[:, :, rr:3+rr]
                 elif r[1]-r[0]==1:
                     feat_patch = tmp2[:, rr:3+rr, :]
+                elif r[1]-r[0]>2 and l[1]-l[0]>2:
+                    ry = int(rr % s2) 
+                    rx = int(rr / s2)
+                    feat_patch = tmp2[:, rx:3+rx, ry:3+ry]
                 else:
                     raise(RuntimeError)
                 feat_patch = feat_patch.reshape(feat_patch.shape[0]*9, -1)

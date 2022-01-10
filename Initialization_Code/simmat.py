@@ -22,6 +22,7 @@ corr = None#'snow'  # 'snow'
 mode = None#'mixed'#'corres'  # * mixed: vc- corrupted, mixture - clean; '': vc and mix - corrupted;reverse:
            # * reverse: vc-clean, mix-corrupt; None, 'corres': correspondence dict b/w clean and corr VCs
 vc_space = 3
+ignore_edge = True # ignore edge of layer output - to reduce comptuations
 
 paral_num = 10
 nimg_per_cat = 5000
@@ -106,23 +107,36 @@ for category in categories:  # * loading individual class categories
                     elif vc_space==2: ds = 3
                     else: raise(RuntimeError)
                     # layer_feature = np.pad(layer_feature)
-                    new_arr = np.zeros((layer_feature.shape[0]*ds, layer_feature.shape[1], layer_feature.shape[2]))
-                    x_ = np.pad(layer_feature, ((0, 0), (1, 1), (1, 1)), mode='edge') 
-                    for i in np.arange(1,x_.shape[1]-1):
-                        for j in np.arange(1,x_.shape[2]-1):
+                    # new_arr = np.zeros((layer_feature.shape[0]*ds, iheight, iwidth))
+                        # new_arr = np.zeros((layer_feature.shape[0]*ds, layer_feature.shape[1], layer_feature.shape[2]))
+                    if not ignore_edge:
+                        new_arr = np.zeros((layer_feature.shape[0]*ds, iheight, iwidth))
+                        x_ = np.pad(layer_feature, ((0, 0), (1, 1), (1, 1)), mode='edge')
+                        ic, jc = x_.shape[1]-1, x_.shape[2]-1
+                    else:
+                        new_arr = np.zeros((layer_feature.shape[0]*ds, iheight-2, iwidth-2))
+                        ic, jc = iheight-1, iwidth-1
+                    for i in np.arange(1,ic):
+                        for j in np.arange(1,jc):
                             if vc_space == 3:
-                                t = x_[:,i-1:i+2,j-1:j+2]
-                            elif vc_space == 2:
-                                t = x_[:,i-1:i+2,:]
+                                if not ignore_edge:
+                                    t = x_[:,i-1:i+2,j-1:j+2]
+                                else:
+                                    t = layer_feature[:,i-1:i+2,j-1:j+2]
+                            # elif vc_space == 2:
+                            #     t = x_[:,i-1:i+2,:]
                             t = t.reshape(t.shape[0]*ds, -1)
                             new_arr[:,i-1,j-1]=t[:,0]
                     lff = new_arr.reshape(new_arr.shape[0], -1).T
-                    del new_arr, x_
+                    del new_arr 
                 else:
                     lff = layer_feature.reshape(layer_feature.shape[0], -1).T  # * 2D to 1D per feature vector [154,512]
                 lff_norm = lff / (np.sqrt(np.sum(lff ** 2, 1) + 1e-10).reshape(-1, 1)) + 1e-10
                 #/ Calculate cosine distance between image and all vmf kernels/means/centers
-                r_set[ii] = cdist(lff_norm, centers, 'cosine').reshape(iheight, iwidth, -1)   # / [7, 22, 512] - 512 values for each pixel
+                if not ignore_edge:
+                    r_set[ii] = cdist(lff_norm, centers, 'cosine').reshape(iheight, iwidth, -1)   # / [7, 22, 512] - 512 values for each pixel
+                else:
+                    r_set[ii] = cdist(lff_norm, centers, 'cosine').reshape(iheight-2, iwidth-2, -1)
                 imgs_par_cat[cat_idx] += 1
 
         print('Determine best threshold for binarization - {} ...'.format(category))
