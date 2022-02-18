@@ -17,12 +17,12 @@ import numpy as np
 import math
 import torch
 
-DA = False#True
+DA = True
 corr = None#'snow'  # 'snow'
-mode = None#'mixed'#'corres'  # * mixed: vc- corrupted, mixture - clean; '': vc and mix - corrupted;reverse:
+mode = ''#'corres'  # * mixed: vc- corrupted, mixture - clean; '': vc and mix - corrupted;reverse:
            # * reverse: vc-clean, mix-corrupt; None, 'corres': correspondence dict b/w clean and corr VCs
-vc_space = 3
-ignore_edge = True # ignore edge of layer output - to reduce comptuations
+vc_space = 0#3
+ignore_edge = False#True # ignore edge of layer output - to reduce comptuations
 
 paral_num = 10
 nimg_per_cat = 5000
@@ -30,9 +30,9 @@ imgs_par_cat = np.zeros(len(categories))
 occ_level = 'ZERO'
 occ_type = ''
 
-print('max_images {}'.format(nimg_per_cat))
+print('{} max_images {}'.format(dataset, nimg_per_cat))
 
-if dataset == 'robin':
+if dataset in ['robin','pseudorobin']:
     categories.remove('bottle')
     cat_test = categories
     # cat = [robin_cats[0]]
@@ -51,7 +51,7 @@ else:
 #############################
 #/ Load Vmf kernels learned by kmeans++ clustering
 if DA and mode in ['mixed', '']:
-    print("Loading corrupted Vmf Kernels")
+    print("Loading corrupted/D2 Vmf Kernels")
     with open(da_dict_dir+'dictionary_{}_{}.pickle'.format(layer, vc_num), 'rb') as fh:
         centers = pickle.load(fh)
 elif DA and mode in ['corres']:
@@ -59,7 +59,7 @@ elif DA and mode in ['corres']:
     with open(da_dict_dir+'corres_dict_{}_{}.pickle'.format(layer, vc_num), 'rb') as fh:
         centers = pickle.load(fh)
 else:
-    print("Loading clean Vmf Kernels")
+    print("Loading clean/D1 Vmf Kernels")
     with open(dict_dir+'dictionary_{}_{}.pickle'.format(layer, vc_num), 'rb') as fh:
         centers = pickle.load(fh)
 ##HERE
@@ -69,15 +69,16 @@ for category in categories:  # * loading individual class categories
     cat_idx = categories.index(category)
     print('Category {} - {} / {}'.format(category, cat_idx, len(categories)))
     if DA and mode not in ['mixed', 'corres']:
-        print("Loading corrupted data")
-        if dataset=='robin':
-            imgs, labels, masks = getImg('test', categories, dataset, data_path, cat_test, \
+        if dataset in ['robin','pseudorobin']:
+            print("Loading Robin test data (pseudo {})".format(dataset=='pseudorobin'))
+            imgs, labels, masks = getImg('test', cat_test, dataset, data_path, [category], \
                 occ_level, occ_type, bool_load_occ_mask=False, subcat=cat) 
         else:
+            print("Loading corrupted data")
             imgs, labels, masks = getImg('train', [category], dataset, data_path, cat_test,\
                 occ_level, occ_type, bool_load_occ_mask=False, determinate=True, corruption=corr)
     else:
-        print("Loading clean data\n")
+        print("Loading clean\D1 data\n")
         imgs, labels, masks = getImg('train', [category], dataset, data_path, cat_test, \
             occ_level, occ_type, bool_load_occ_mask=False)
     imgs = imgs[:nimg_per_cat]
@@ -147,8 +148,13 @@ for category in categories:  # * loading individual class categories
         layer_feature_b = [None for nn in range(100)]
         magic_thhs = np.asarray([x*1/nthresh for x in range(nthresh)])  # * array of 20 equidistant values between 0 and 1
 
+        if len(r_set)>=100:
+            range_nums = 100
+        else:
+            range_nums = len(r_set)
+            print("No. of images is <100: {}".format(range_nums))
         for idx, magic_thh in enumerate(magic_thhs):
-            for nn in range(100):  # ! using only 100/986 images?
+            for nn in range(range_nums):  # ! using only 100/986 images?
                 layer_feature_b[nn] = (r_set[nn] < magic_thh).astype(int).T  # * [512, 22, 7] mask
                 coverage[idx] += np.mean(np.sum(layer_feature_b[nn], axis=0)>0) #/ ??
                 act_per_pix[idx] += np.mean(np.sum(layer_feature_b[nn], axis=0)) #/ Avg. number of vc activations/pixel

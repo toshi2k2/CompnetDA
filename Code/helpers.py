@@ -251,6 +251,7 @@ def getImg(mode,categories, dataset, data_path, cat_test=None, occ_level='ZERO',
 					img_dir = data_path+'coco_occ/{}_occ'.format(category)
 					filelist = data_path+'coco_occ/{}_{}.txt'.format(category, occ_level)
 			elif dataset == 'robin':
+				# print("loading robin test data")
 				cats = ['context', 'weather', 'texture', 'pose', 'shape']
 				if subcat is None:
 					subcat = cats
@@ -267,7 +268,16 @@ def getImg(mode,categories, dataset, data_path, cat_test=None, occ_level='ZERO',
 					label = categories.index(category)
 					test_labels += [label]*len(img_list)
 					occ_imgs += [False,False]*len(img_list)
-				#! add sublabels output as well
+				#! add subcategory labels to output 
+			elif dataset == 'pseudorobin':
+				#! Needs varaible for data path
+				img_dir = './' + data_path + 'Robin/cls_pseudo_test_all/{}/'.format(category)
+				img_list = os.listdir(img_dir)
+				img_list = [img_dir + s for s in img_list]
+				test_imgs += img_list
+				label = categories.index(category)
+				test_labels += [label]*len(img_list)
+				occ_imgs += [False,False]*len(img_list)
 
 			if dataset in ['pascal3d+','coco']:
 				if os.path.exists(filelist):
@@ -312,7 +322,8 @@ def imgLoader(img_path,mask_path,bool_resize_images=True,bool_square_images=Fals
 	input_image = Image.open(img_path)
 	if bool_resize_images:
 		if bool_square_images:
-			input_image.resize((224,224),Image.ANTIALIAS)
+			input_image=input_image.resize((224,224),Image.ANTIALIAS)
+			# print(input_image.size)
 		else:
 			sz=input_image.size
 			min_size = np.min(sz)

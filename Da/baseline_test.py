@@ -19,18 +19,21 @@ u = UnNormalize()
 ###################
 # Test parameters #
 ###################
-# saved_model = None
-# saved_model = 'baseline_models/train_None_lr_0.01_pascal3d+_pretrained_False_epochs_15_occ_False_backbonevgg_0/vgg14.pth'
+# saved_model = 'baseline_models/ROBIN-train-resnet50.pth'
+backbone_type='vgg_bn'
+# saved_model = 'baseline_models/train_None_lr_0.01_{}_scratchFalsespretrained_False_epochs_50_occ_False_backbone{}_0/{}3.pth'.format(dataset, backbone_type, backbone_type)
+# saved_model = 'baseline_models/train_None_lr_0.0001_robin_scratchFalsepretrained_False_epochs_100_occ_False_backboneresnet50_0/resnet5047.pth'
 # saved_model = 'baseline_models/train_None_lr_0.01_pascal3d+_scratchTruepretrained_True_epochs_50_occ_False_backbonevgg_0/vgg1.pth'
-saved_model = 'baseline_models/train_None_lr_0.01_robin_scratchFalsepretrained_False_epochs_50_occ_False_backbonevgg_bn_0/vgg_bn4.pth'
+# saved_model = 'baseline_models/train_None_lr_0.01_robin_scratchFalsepretrained_False_epochs_50_occ_False_backbonevgg_bn_0/vgg_bn3.pth'
 # saved_model = 'models_old/best.pth'
+saved_model = 'baseline_models/robinNone_lr_0.001_scratFalsepretrFalse_ep60_occFalse_backbvgg_bn_0/vgg_bn51.pth'
 corr = None#'snow'
-backbone_type = 'vgg_bn'
+# backbone_type = 'resnet50'
 
 likely = 0.6  # occlusion likelihood
 occ_levels = ['ZERO', 'ONE', 'FIVE', 'NINE'] # occlusion levels to be evaluated [0%,20-40%,40-60%,60-80%]
 
-if dataset == 'robin':
+if dataset in ['robin', 'psuedorobin']:
 	occ_levels = ['ZERO']
 	categories_train.remove('bottle')
 	categories = categories_train
@@ -46,6 +49,7 @@ def test(models, test_data, batch_size):
 
 	with torch.no_grad():
 		for i, data in enumerate(tqdm.tqdm(test_loader)):
+			# print(data[0].shape)
 			input,mask, label = data
 			input.requires_grad = False
 
@@ -66,6 +70,9 @@ def test(models, test_data, batch_size):
 			# print(out, c_label, out.argmax())
 			# scores = np.concatenate((scores,out))
 			out = out.argmax()
+			# out = out[:11].argmax()
+			# if out>2:
+			# 	out-=1
 			correct[c_label] += np.sum(out == c_label)
 
 			total_samples[c_label] += 1
@@ -96,9 +103,13 @@ if __name__ == '__main__':
 	elif backbone_type=='vgg_bn':
 		model = models.vgg16_bn(pretrained=True)
 		model.classifier[6]  = torch.nn.Linear(4096, len(categories_train))
-	elif backbone_type=='resnet50' or backbone_type == 'resnet18' or backbone_type == 'resnext' or \
+	elif backbone_type == 'resnet18' or backbone_type == 'resnext' or \
 		backbone_type=='densenet':
 		exit("baselines {} not implemented".format(backbone_type))
+	elif backbone_type=='resnet50':# or backbone_type=='resnext':
+		model = models.resnet50(pretrained=True)
+		model.fc = torch.nn.Linear(model.fc.in_features, len(categories_train))
+		# model.fc = torch.nn.Linear(model.fc.in_features, 12)
 
 	if device_ids:
 		load_dict = torch.load(path, map_location='cuda:{}'.format(0))
@@ -129,6 +140,7 @@ if __name__ == '__main__':
 					print("All Subcategories\n")
 				elif dataset == 'robin':
 					print(cat)
+					cat=[cat]
 				# load images
 				if corr is not None:
 					print("Loading corrupted data\n")
@@ -136,7 +148,7 @@ if __name__ == '__main__':
 						categories, occ_level, occ_type,bool_load_occ_mask=True, determinate=True, corruption=corr)
 				else:
 					test_imgs, test_labels, masks = getImg('test', categories_train, dataset,data_path, \
-						categories, occ_level, occ_type,bool_load_occ_mask=True, subcat=[cat])
+						categories, occ_level, occ_type,bool_load_occ_mask=True, subcat=cat)
 
 				#* removing an image due to errors
 				if corr is not None:

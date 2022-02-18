@@ -5,7 +5,7 @@ sys.path.insert(1, p)
 from Code.model import Net
 from Code.helpers import getImg, Imgset, imgLoader, save_checkpoint
 from Code.config import device_ids, categories, categories_train, dataset, data_path, \
-	backbone_type, vggmodel_dir
+	backbone_type, vggmodel_dir, layer
 from Code.config import config as cfg
 from torch.utils.data import DataLoader
 # from Code.losses import ClusterLoss
@@ -23,11 +23,11 @@ import random
 #---------------------
 # beta = 3 # mix loss
 # likely = 0.6 # occlusion likelihood
-lr = 1e-2 # learning rate
-batch_size = 1
+lr = 1e-3 # learning rate
+batch_size = 64
 # Training setup
 # mix_flag = True # train mixture components
-ncoord_it = 50#15 	#number of epochs to train
+ncoord_it = 60 	#number of epochs to train
 corr = None#'snow'
 scratch = False#True
 
@@ -44,9 +44,9 @@ if bool_train_with_occluders:
 else:
 	occ_levels_train = ['ZERO']
 
-backbone_type = 'vgg_bn'
+backbone_type = 'resnet50'
 
-out_dir = vggmodel_dir + '/train_{}_lr_{}_{}_scratch{}pretrained_{}_epochs_{}_occ_{}_backbone{}_{}/'.format(corr, lr, dataset, scratch,\
+out_dir = vggmodel_dir + '/{}{}_lr_{}_scrat{}pretr{}_ep{}_occ{}_backb{}_{}/'.format(dataset,corr, lr, scratch,\
 	bool_load_pretrained_model,ncoord_it,bool_train_with_occluders,backbone_type,device_ids[0])
 
 
@@ -62,7 +62,7 @@ def train(model, train_data, val_data, epochs, batch_size, learning_rate, savedi
 	val_loaders=[]
 
 	for i in range(len(val_data)):
-		val_loader = DataLoader(dataset=val_data[i], batch_size=batch_size, shuffle=True)
+		val_loader = DataLoader(dataset=val_data[i], batch_size=1, shuffle=True)
 		val_loaders.append(val_loader)
 
 	classification_loss = nn.CrossEntropyLoss()
@@ -71,11 +71,12 @@ def train(model, train_data, val_data, epochs, batch_size, learning_rate, savedi
 	# scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer=optimizer,gamma=0.98)
 
 	# Observe that all parameters are being optimized
-	optimizer = torch.optim.SGD(model.parameters(), lr=0.001, momentum=0.9)
+	optimizer = torch.optim.SGD(model.parameters(), lr=lr, momentum=0.9)
 
 	# Decay LR by a factor of 0.1 every 7 epochs
-	scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=7, gamma=0.1)
-
+	# scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=7, gamma=0.1)
+	scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer=optimizer,gamma=0.95)
+	# batch_size=64
 	print('Training')
 
 	for epoch in range(epochs):
@@ -95,14 +96,14 @@ def train(model, train_data, val_data, epochs, batch_size, learning_rate, savedi
 			input = input.cuda(device_ids[0])
 			label = label.cuda(device_ids[0])
 
-			optimizer.zero_grad()
+			# optimizer.zero_grad()
 
 			output = model(input)
 
 			out = output.argmax(1)
 			correct += torch.sum(out == label)
-			# class_loss = classification_loss(output, label) / output.shape[0]
-			class_loss = classification_loss(output, label)
+			class_loss = classification_loss(output, label) / output.shape[0]
+			# class_loss = classification_loss(output, label)
 
 			loss = class_loss
 			# if alpha != 0:
@@ -113,17 +114,17 @@ def train(model, train_data, val_data, epochs, batch_size, learning_rate, savedi
 			# 	mix_loss = like[0,label[0]]
 			# 	loss += -beta *mix_loss
 
-			#with torch.autograd.set_detect_anomaly(True):
+			# with torch.autograd.set_detect_anomaly(True):
 			loss.backward()
 
 			# # pseudo batches
-			# if np.mod(index,batch_size)==0:# and index!=0:
-			# 	optimizer.step()
-			# 	optimizer.zero_grad()
+			# if np.mod(index,batch_size)==0 and index!=0:
+			optimizer.step()
+			optimizer.zero_grad()
 
 			train_loss += loss.detach() * input.shape[0]
-			optimizer.step()
-
+			# optimizer.step()
+		# if epoch < 50:
 		scheduler.step()
 		train_acc = correct.cpu().item() / total_train
 		train_loss = train_loss.cpu().item() / total_train
@@ -186,13 +187,17 @@ if __name__ == '__main__':
 	# 	net = resnet_feature_extractor(backbone_type, layer)
 	elif backbone_type=='vgg_bn':
 		net = models.vgg16_bn(pretrained=not scratch)
-	# elif backbone_type=='resnet50' or backbone_type=='resnext':
-	# 	net = resnet_feature_extractor(backbone_type, layer)
+	elif backbone_type=='resnet50':# or backbone_type=='resnext':
+		net = models.resnet50(pretrained=not scratch)
 	else:
 		raise(RuntimeError)
 	# print(net)
-	num_ftrs = net.classifier[6].in_features
-	net.classifier[6] = nn.Linear(num_ftrs, len(categories_train))
+	if backbone_type in ['vgg', 'vgg_bn']:
+		num_ftrs = net.classifier[6].in_features
+		net.classifier[6] = nn.Linear(num_ftrs, len(categories_train))
+	elif backbone_type in ["resnet50"]:
+		# num_ftrs = net.fc.in_features
+		net.fc = nn.Linear(net.fc.in_features, len(categories_train))
 	# print(net)
 
 	net = net.cuda(device_ids[0])
@@ -247,11 +252,11 @@ if __name__ == '__main__':
 
 	print('Total imgs for train ' + str(len(train_imgs)))
 	print('Total imgs for val ' + str(len(val_imgs)))
-	train_imgset = Imgset(train_imgs,train_masks, train_labels, imgLoader,bool_square_images=False)
+	train_imgset = Imgset(train_imgs,train_masks, train_labels, imgLoader,bool_square_images=True)
 
 	val_imgsets = []
 	if val_imgs:
-		val_imgset = Imgset(val_imgs,val_masks, val_labels, imgLoader,bool_square_images=False)
+		val_imgset = Imgset(val_imgs,val_masks, val_labels, imgLoader,bool_square_images=True)
 		val_imgsets.append(val_imgset)
 
 	# write parameter settings into output folder

@@ -11,15 +11,17 @@ from config_initialization import vc_num, dataset, categories, data_path, \
             da_dict_dir, da_init_path, robin_cats
 from Code.helpers import getImg, imgLoader, Imgset
 from torch.utils.data import DataLoader
-import cv2
+import cv2, random
 import gc
 import matplotlib.pyplot as plt
 import scipy.io as sio
+from Code.config import backbone_type
 
 DA = True
 mode = '' # '', mixed, None, corres
 corr = None #'snow'  #'snow'
 vc_space = 0#3
+add_data = False#True # add data to current data
 
 if dataset in ['robin','pseudorobin']:
     categories.remove('bottle')
@@ -53,7 +55,7 @@ if not os.path.exists(mixdir):
     os.makedirs(mixdir)
 occ_level='ZERO'
 occ_type=''
-spectral_split_thresh=0.1
+# spectral_split_thresh=0.1
 
 print("Loading {} and {}\n".format(dictfile, mixdir))
 
@@ -72,27 +74,49 @@ def learn_mix_model_vMF(category,num_layers = 2,num_clusters_per_layer = 2,frac_
         print("Loading clean data")
         imgs, labels, masks = getImg('train', [category], dataset, data_path, cat_test, \
             occ_level, occ_type, bool_load_occ_mask=False)
-    # similarity matrix
-    if DA or mode == 'mixed':
-        print("loading DA similarity matrix")
-        sim_fname = os.path.join(da_sim_dir, 'simmat_mthrh045_{}_K{}.pickle'.format(category,vc_num))
-        # sim_fname = model_save_dir+'da_init_vgg/'+'similarity_vgg_pool5_pascal3d+/'+'simmat_mthrh045_{}_K{}.pickle'.format(category, 512)	
-    else:
-        # sim_fname = model_save_dir+'init_vgg/'+'similarity_vgg_pool4/'+'simmat_mthrh045_{}_K{}.pickle'.format(category, 512)
-        sim_fname = os.path.join(sim_dir, 'simmat_mthrh045_{}_K{}.pickle'.format(category,vc_num))
-        # sim_fname = model_save_dir+'init_vgg/'+'similarity_vgg_pool5_pascal3d+/'+'simmat_mthrh045_{}_K{}.pickle'.format(category, 512)
-    print("sim_fname:", sim_fname)
-    # Spectral clustering based on the similarity matrix
-    with open(sim_fname, 'rb') as fh:
-        mat_dis1, _ = pickle.load(fh)
+    if add_data:
+        print("Adding clean data from robin train!")
+        frc = 0.2
+        imgs2, labels2, masks2 = getImg('train', [category], 'robin', data_path, cat_test, \
+            occ_level, occ_type, bool_load_occ_mask=False)
+        imgs+=random.sample(imgs2, int(min(len(imgs), len(imgs2))*frc))
+        labels+=labels2[:int(min(len(labels), len(labels2))*frc)]
+        masks+=masks2[:int(min(len(masks), len(masks2))*frc)]
+        # imgs+=imgs2
+        # labels+=labels2
+        # masks+=masks2
 
-    mat_dis = mat_dis1
-    subN = int(mat_dis.shape[0]*frac_data)
-    mat_dis = mat_dis[:subN,:subN]
+    # # similarity matrix
+    # if DA or mode == 'mixed':
+    #     print("loading DA similarity matrix")
+    #     sim_fname = os.path.join(da_sim_dir, 'simmat_mthrh045_{}_K{}.pickle'.format(category,vc_num))
+    #     # sim_fname = model_save_dir+'da_init_vgg/'+'similarity_vgg_pool5_pascal3d+/'+'simmat_mthrh045_{}_K{}.pickle'.format(category, 512)	
+    # else:
+    #     # sim_fname = model_save_dir+'init_vgg/'+'similarity_vgg_pool4/'+'simmat_mthrh045_{}_K{}.pickle'.format(category, 512)
+    #     sim_fname = os.path.join(sim_dir, 'simmat_mthrh045_{}_K{}.pickle'.format(category,vc_num))
+    #     # sim_fname = model_save_dir+'init_vgg/'+'similarity_vgg_pool5_pascal3d+/'+'simmat_mthrh045_{}_K{}.pickle'.format(category, 512)
+    # print("sim_fname:", sim_fname)
+    # # Spectral clustering based on the similarity matrix
+    # with open(sim_fname, 'rb') as fh:
+    #     mat_dis1, _ = pickle.load(fh)
+
+    # mat_dis = mat_dis1
+    # subN = int(mat_dis.shape[0]*frac_data)
+    # mat_dis = mat_dis[:subN,:subN]
+    subN = len(labels)
     print('total number of instances for obj {}: {}'.format(category, subN))
     N=subN
     img_idx = np.asarray([nn for nn in range(N)])
-    imgs = imgs[:N]
+    
+    d1_mix_model_path = da_init_path+'og_mix_model_vmf_robin_EM_all'#.format(dataset)
+    d1_savename = os.path.join(d1_mix_model_path,'mmodel_{}_K4_FEATDIM{}_{}_specific_view.pickle'.\
+        format(category, vc_num, layer))
+    print("Loading previous Mixtures\n {}".format(d1_savename))
+    with open(d1_savename, 'rb') as fh:
+        alpha = pickle.load(fh)
+    K = len(alpha)
+    mixmodel_lbs = np.ones(len(labels))*-1
+    # imgs = imgs[:N]
 
     imgset = Imgset(imgs, masks, labels, imgLoader, bool_square_images=False)
     data_loader = DataLoader(dataset=imgset, batch_size=1, shuffle=False)
@@ -133,6 +157,19 @@ def learn_mix_model_vMF(category,num_layers = 2,num_clusters_per_layer = 2,frac_
         tmp = np.exp(vMF_kappa*tmp)
         # reshape such that the spatial position is preserved during learning
         feat_map = tmp.reshape(iheight, iwidth, -1).astype(np.float32).T
+        if feat_map.shape[2]>alpha[0].shape[2] or feat_map.shape[1]>alpha[0].shape[1]:
+            print(ii, feat_map.shape)
+            if feat_map.shape[1]>alpha[0].shape[1]:
+                st_idx = (feat_map.shape[1]-alpha[0].shape[1])//2
+                feat_map = feat_map[:,st_idx:st_idx+alpha[0].shape[1],:]
+            if feat_map.shape[2]>alpha[0].shape[2]:
+                st_idx = (feat_map.shape[2]-alpha[0].shape[2])//2
+                feat_map = feat_map[:,:,st_idx:st_idx+alpha[0].shape[2]]
+            # N-=1
+            # subN-=1
+            # mixmodel_lbs = np.ones(N)*-1
+            # img_idx = np.asarray([nn for nn in range(N)])
+            # continue
         r_set.append(feat_map)
 
     # num cluster centers
@@ -142,6 +179,13 @@ def learn_mix_model_vMF(category,num_layers = 2,num_clusters_per_layer = 2,frac_
     # height
     max_2 = max([r_set[nn].shape[2] for nn in range(N)])
     print(max_0, max_1, max_2)
+    if max_2<alpha[0].shape[2]:
+        print("Incorrect padding! {}!={}".format(alpha[0].shape, (max_0, max_1, max_2)))
+        max_2 = alpha[1].shape[2]
+    if max_1<alpha[0].shape[1]:
+        print("Incorrect padding! {}!={}".format(alpha[0].shape, (max_0, max_1, max_2)))
+        max_1 = alpha[1].shape[1]
+    assert(alpha[0].shape==(max_0, max_1, max_2))
     layer_feature_vmf = np.zeros((N, max_0, max_1, max_2), dtype=np.float32)
 
     for nn in range(N):
@@ -157,139 +201,104 @@ def learn_mix_model_vMF(category,num_layers = 2,num_clusters_per_layer = 2,frac_
         r_set[nn] = []
         layer_feature_vmf[nn,:,:,:] = padded
 
-    mat_full = mat_dis + mat_dis.T - np.ones((N,N))
-    np.fill_diagonal(mat_full, 0)
+    # mat_full = mat_dis + mat_dis.T - np.ones((N,N))
+    # np.fill_diagonal(mat_full, 0)
 
-    mat_sim = 1. - mat_full
+    # mat_sim = 1. - mat_full
 
-    # setup caching variables
-    tmp = list()
-    tmp.append(np.zeros(mat_sim.shape[0]))
-    LABELS 	= list()
-    LABELS.append(tmp)
-    tmp = list()
-    tmp.append(mat_sim)
-    MAT		= list()
-    MAT.append(tmp)
-    tmp = list()
-    tmp.append(range(mat_sim.shape[0]))
-    IMAGEIDX = list()
-    IMAGEIDX.append(tmp)
+    # # setup caching variables
+    # tmp = list()
+    # tmp.append(np.zeros(mat_sim.shape[0]))
+    # LABELS 	= list()
+    # LABELS.append(tmp)
+    # tmp = list()
+    # tmp.append(mat_sim)
+    # MAT		= list()
+    # MAT.append(tmp)
+    # tmp = list()
+    # tmp.append(range(mat_sim.shape[0]))
+    # IMAGEIDX = list()
+    # IMAGEIDX.append(tmp)
 
-    # start hierarchical spectral clustering
-    FINAL_CLUSTER_ASSIGNMENT=[]
-    for i in range(num_layers):
-        MAT_SUB = list()
-        LABELS_SUB = list()
-        IMAGEIDX_SUB = list()
+    # # start hierarchical spectral clustering
+    # FINAL_CLUSTER_ASSIGNMENT=[]
+    # for i in range(num_layers):
+    #     MAT_SUB = list()
+    #     LABELS_SUB = list()
+    #     IMAGEIDX_SUB = list()
 
-        print('Clustering layer {} ...'.format(i))
-        for k in range(np.power(num_clusters_per_layer,i)):
-            parent_counter 	= int(np.floor(k / num_clusters_per_layer))
-            leaf_counter	= int(np.mod(k,num_clusters_per_layer))
-            idx = np.where(LABELS[i][parent_counter] == leaf_counter)[0] #! ??
-            if len(idx)>spectral_split_thresh*N:
-            # if len(idx)>1:#0.02*N: #! To catch the loop going to the elif condition
-                mat_sim_sub = MAT[i][parent_counter][np.ix_(idx, idx)] # subsample similarity matrix
-                MAT_SUB.append(mat_sim_sub)
-                IMAGEIDX_SUB.append(np.array(IMAGEIDX[i][parent_counter])[idx])
-                cls_solver = SpectralClustering(n_clusters=num_clusters_per_layer, affinity='precomputed', \
-                    random_state=0)
-                cluster_result = cls_solver.fit_predict(mat_sim_sub)
-                LABELS_SUB.append(cluster_result)
+    #     print('Clustering layer {} ...'.format(i))
+    #     for k in range(np.power(num_clusters_per_layer,i)):
+    #         parent_counter 	= int(np.floor(k / num_clusters_per_layer))
+    #         leaf_counter	= int(np.mod(k,num_clusters_per_layer))
+    #         idx = np.where(LABELS[i][parent_counter] == leaf_counter)[0] #! ??
+    #         if len(idx)>spectral_split_thresh*N:
+    #         # if len(idx)>1:#0.02*N: #! To catch the loop going to the elif condition
+    #             mat_sim_sub = MAT[i][parent_counter][np.ix_(idx, idx)] # subsample similarity matrix
+    #             MAT_SUB.append(mat_sim_sub)
+    #             IMAGEIDX_SUB.append(np.array(IMAGEIDX[i][parent_counter])[idx])
+    #             cls_solver = SpectralClustering(n_clusters=num_clusters_per_layer, affinity='precomputed', \
+    #                 random_state=0)
+    #             cluster_result = cls_solver.fit_predict(mat_sim_sub)
+    #             LABELS_SUB.append(cluster_result)
 
-                print('{} {} {} {}'.format(i,k,sum(cluster_result==0),sum(cluster_result==1)))
+    #             print('{} {} {} {}'.format(i,k,sum(cluster_result==0),sum(cluster_result==1)))
 
-                if i==num_layers-1:
-                    for ff in range(num_clusters_per_layer):
-                        idx_tmp=IMAGEIDX_SUB[k][cluster_result == ff]
-                        if len(idx_tmp)>0.02*N:
-                            FINAL_CLUSTER_ASSIGNMENT.append(np.array(idx_tmp))
-                        # elif len(idx_tmp)>=1:
-                        #     FINAL_CLUSTER_ASSIGNMENT.append(np.array(idx_tmp))
-                        else:
-                            print("Cluster: ", len(idx_tmp))
-                            print("Cluster has no data")
-                            # raise RuntimeError("Cluster has no data")
-            elif len(idx)>0.02*N:#0:
-                FINAL_CLUSTER_ASSIGNMENT.append(np.array(IMAGEIDX[i][parent_counter])[idx]) #! this appends the last cluster - doesn't take care of additional cluster requirements
-                LABELS_SUB.append([])
-                IMAGEIDX_SUB.append([])
-                MAT_SUB.append([])
-            else:
-                LABELS_SUB.append([])
-                IMAGEIDX_SUB.append([])
-                MAT_SUB.append([])
-        MAT.append(MAT_SUB)
-        LABELS.append(LABELS_SUB)
-        IMAGEIDX.append(IMAGEIDX_SUB)
+    #             if i==num_layers-1:
+    #                 for ff in range(num_clusters_per_layer):
+    #                     idx_tmp=IMAGEIDX_SUB[k][cluster_result == ff]
+    #                     if len(idx_tmp)>0.02*N:
+    #                         FINAL_CLUSTER_ASSIGNMENT.append(np.array(idx_tmp))
+    #                     # elif len(idx_tmp)>=1:
+    #                     #     FINAL_CLUSTER_ASSIGNMENT.append(np.array(idx_tmp))
+    #                     else:
+    #                         print("Cluster: ", len(idx_tmp))
+    #                         raise RuntimeError("Cluster has no data")
+    #         elif len(idx)>0.02*N:#0:
+    #             FINAL_CLUSTER_ASSIGNMENT.append(np.array(IMAGEIDX[i][parent_counter])[idx]) #! this appends the last cluster - doesn't take care of additional cluster requirements
+    #             LABELS_SUB.append([])
+    #             IMAGEIDX_SUB.append([])
+    #             MAT_SUB.append([])
+    #         else:
+    #             LABELS_SUB.append([])
+    #             IMAGEIDX_SUB.append([])
+    #             MAT_SUB.append([])
+    #     MAT.append(MAT_SUB)
+    #     LABELS.append(LABELS_SUB)
+    #     IMAGEIDX.append(IMAGEIDX_SUB)
 
-    mixmodel_lbs = np.ones(len(LABELS[0][0]))*-1
-    K=len(FINAL_CLUSTER_ASSIGNMENT) # number of clusters
+    # mixmodel_lbs = np.ones(len(LABELS[0][0]))*-1
+    # K=len(FINAL_CLUSTER_ASSIGNMENT) # number of clusters
+    # for i in range(K):
+    #     mixmodel_lbs[FINAL_CLUSTER_ASSIGNMENT[i]]=i
+
+    # mixmodel_lbs = mixmodel_lbs[:N]
+
+    # for kk in range(K):
+    #     print('cluster {} has {} samples'.format(kk, np.sum(mixmodel_lbs==kk)))
+
+    # alpha = []
+    # for kk in range(K):
+    #     # get samples for mixture component
+    #     bool_clust = mixmodel_lbs==kk
+    #     bidx = [i for i, x in enumerate(bool_clust) if x]
+    #     num_clusters = vc_num#vmf.shape[1]
+    #     # loop over samples
+    #     for idx in bidx:
+    #         # compute
+    #         vmf_sum = np.sum(layer_feature_vmf[img_idx[idx]], axis=0)
+    #         vmf_sum = np.reshape(vmf_sum, (1, vmf_sum.shape[0], vmf_sum.shape[1]))
+    #         vmf_sum = vmf_sum.repeat(num_clusters, axis=0)+1e-3
+    #         mask = vmf_sum > 0
+    #         layer_feature_vmf[img_idx[idx]] = mask*(layer_feature_vmf[img_idx[idx]]/vmf_sum)
+
+    #     N_samp = np.sum(layer_feature_vmf[img_idx[bidx]] > 0, axis=0) #/ stores the number of samples
+    #     mask = (N_samp > 0)
+    #     vmf_sum = mask * (np.sum(layer_feature_vmf[img_idx[bidx]], axis=0) / (N_samp + 1e-5)).astype(np.float32)
+    #     alpha.append(vmf_sum)
+
+    # d1_mix_model_path = 'models/da_init_{}/1_mix_model_vmf_{}_EM_all'.format(backbone_type,dataset)
     
-    #/ Redoing Spectral clustering if number of clusters is less than expected
-    if K<num_layers*num_clusters_per_layer:
-        print("\nNumber of clusters {} is less than expected. Recalculating\n".format(K))
-        tmp = list()
-        tmp.append(np.zeros(mat_sim.shape[0]))
-        LABELS 	= list()
-        LABELS.append(tmp)
-        # tmp = list()
-        # tmp.append(range(mat_sim.shape[0]))
-        IMAGEIDX = list()
-        IMAGEIDX.append(np.arange(mat_sim.shape[0]))
-
-        # start hierarchical spectral clustering
-        FINAL_CLUSTER_ASSIGNMENT=[]
-
-        print('Clustering layer {} ...'.format(i))
-        cls_solver = SpectralClustering(n_clusters=int(num_layers*num_clusters_per_layer), affinity='precomputed', \
-            random_state=0)
-        cluster_result = cls_solver.fit_predict(mat_sim)
-        LABELS.append(cluster_result)
-
-        print('{} {} {} {}'.format(sum(cluster_result==0),sum(cluster_result==1), sum(cluster_result==2),sum(cluster_result==3)))
-
-        # if i==num_layers-1:
-        for ff in range(int(num_clusters_per_layer*num_layers)):
-            idx_tmp=IMAGEIDX[0][cluster_result == ff]
-            FINAL_CLUSTER_ASSIGNMENT.append(np.array(idx_tmp))
-            #! Need filter for too small cluster images
-            # if len(idx_tmp)>0.02*N:
-            #     FINAL_CLUSTER_ASSIGNMENT.append(np.array(idx_tmp))
-            # else:
-            #     print("Cluster: ", len(idx_tmp))
-            #     raise RuntimeError("Cluster has less/no data")
-    #/ 
-    K=len(FINAL_CLUSTER_ASSIGNMENT) # number of clusters
-    for i in range(K):
-        mixmodel_lbs[FINAL_CLUSTER_ASSIGNMENT[i]]=i
-
-    mixmodel_lbs = mixmodel_lbs[:N]
-
-    for kk in range(K):
-        print('cluster {} has {} samples'.format(kk, np.sum(mixmodel_lbs==kk)))
-
-    alpha = []
-    for kk in range(K):
-        # get samples for mixture component
-        bool_clust = mixmodel_lbs==kk
-        bidx = [i for i, x in enumerate(bool_clust) if x]
-        num_clusters = vc_num#vmf.shape[1]
-        # loop over samples
-        for idx in bidx:
-            # compute
-            vmf_sum = np.sum(layer_feature_vmf[img_idx[idx]], axis=0)
-            vmf_sum = np.reshape(vmf_sum, (1, vmf_sum.shape[0], vmf_sum.shape[1]))
-            vmf_sum = vmf_sum.repeat(num_clusters, axis=0)+1e-3
-            mask = vmf_sum > 0
-            layer_feature_vmf[img_idx[idx]] = mask*(layer_feature_vmf[img_idx[idx]]/vmf_sum)
-
-        N_samp = np.sum(layer_feature_vmf[img_idx[bidx]] > 0, axis=0) #/ stores the number of samples
-        mask = (N_samp > 0)
-        vmf_sum = mask * (np.sum(layer_feature_vmf[img_idx[bidx]], axis=0) / (N_samp + 1e-5)).astype(np.float32)
-        alpha.append(vmf_sum)
-
     '''
     # ML updates of mixture model and vMF mixture coefficients
     '''
@@ -301,7 +310,7 @@ def learn_mix_model_vMF(category,num_layers = 2,num_clusters_per_layer = 2,frac_
         changed_samples = np.zeros(subN)
         for nn in range(subN):
             if nn % 100 == 0:
-                print('{}'.format(nn))
+                print('{}/{}'.format(nn, subN))
             #compute feature likelihood
             for kk in range(K):
                 like_map = layer_feature_vmf[img_idx[nn]]*alpha[kk]
@@ -314,10 +323,11 @@ def learn_mix_model_vMF(category,num_layers = 2,num_clusters_per_layer = 2,frac_
                 changed+=1
                 changed_samples[nn]=1
             mixmodel_lbs[nn] = new_assignment
-
-        for kk in range(K):
-            print('cluster {} has {} samples'.format(kk, np.sum(mixmodel_lbs == kk)))
-        print('{} changed assignments'.format(changed))
+        
+        if ee>0:
+            for kk in range(K):
+                print('cluster {} has {} samples'.format(kk, np.sum(mixmodel_lbs == kk)))
+            print('{} changed assignments'.format(changed))
 
         #update mixture coefficients here
         for kk in range(K):
@@ -340,7 +350,8 @@ def learn_mix_model_vMF(category,num_layers = 2,num_clusters_per_layer = 2,frac_
                 alpha[kk]= mask*(np.sum(layer_feature_vmf[img_idx[bidx]], axis=0) / (N_samp + 1e-5)).astype(np.float32)
                 gc.collect()
 
-        if changed/subN<0.01:
+        if changed/subN<0.01 and ee>0:
+            print("Breaking EM loop at iteration {} - class {}\n".format(ee+1, category))
             break
         if len(alpha) < num_layers*num_clusters_per_layer:
             print("Mixtures<",len(alpha))

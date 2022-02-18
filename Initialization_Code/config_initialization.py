@@ -8,12 +8,13 @@ device_ids = [0]
 data_path = 'data/'
 model_save_dir = 'models/'
 
-dataset = 'pascal3d+' # pascal3d+, coco, robin
+dataset = 'robin' # pascal3d+, coco, robin, pseudorobin
 nn_type = 'vgg_bn' #vgg, vgg_bn, vgg_tr, resnet50, resnext, resnet152
 vMF_kappa=30
 vc_num = 512
-vc_shape = 0
+vc_shape = 0#0
 
+# categories = ['tvmonitor']
 categories = ['aeroplane', 'bicycle', 'boat', 'bottle', 'bus', 'car', 'chair', 'diningtable', 'motorbike', 'sofa',
 			  'train', 'tvmonitor']
 cat_test = ['aeroplane', 'bicycle', 'bus', 'car', 'motorbike', 'train']
@@ -26,7 +27,7 @@ if nn_type =='vgg':
 	elif layer =='pool5':
 		extractor = models.vgg16(pretrained=True).features
 elif nn_type =='vgg_bn':
-	layer = 'pool4'  # 'pool5','pool4'
+	layer = 'pool5'  # 'pool5','pool4'
 	if layer == 'pool4':
 		extractor=models.vgg16_bn(pretrained=True).features[0:24]
 	elif layer =='pool5':

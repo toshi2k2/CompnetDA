@@ -9,3 +9,5 @@ Initialization_Code/rough.ipynb
 *.pyc
 .vscode
 *.pth
+*.pickle
+*.npz

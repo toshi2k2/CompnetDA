@@ -21,17 +21,18 @@ u = UnNormalize()
 ###################
 # Test parameters #
 ###################
-# saved_model = None
+# saved_model = 'baseline_models/ROBIN-train-resnet50.pth'
+saved_model = 'baseline_models/robinNone_lr_0.001_scratFalsepretrFalse_ep60_occFalse_backbvgg_bn_0/vgg_bn50.pth'
 # saved_model = 'baseline_models/train_None_lr_0.01_pascal3d+_pretrained_False_epochs_15_occ_False_backbonevgg_bn_0/vgg_bn12.pth'
 # saved_model = 'models_old/best.pth'
-saved_model = 'baseline_models/train_None_lr_0.01_robin_scratchFalsepretrained_False_epochs_50_occ_False_backbonevgg_bn_0/vgg_bn3.pth'
+# saved_model = 'baseline_models/train_None_lr_0.01_robin_scratchFalsepretrained_False_epochs_50_occ_False_backbonevgg_bn_0/vgg_bn3.pth'
 # saved_model = 'baseline_models/train_None_lr_0.01_pascal3d+_pretrained_False_epochs_15_occ_False_backbonevgg_0/vgg14.pth'
 # saved_model = 'baseline_models/train_None_lr_0.01_pascal3d+_scratchTruepretrained_True_epochs_50_occ_False_backbonevgg_0/vgg1.pth'
 corr = None#'snow'
 rbsta=True
-backbone_type = 'vgg_bn'
-save_checkpt = True
-
+backbone_type = 'vgg_bn' #vgg_bn, resnet50
+save_checkpt = False
+robin_all = False # run on all robin test nuisance altogether
 check_changed_pmtr = False # check what parameters are training - run at least once for debugging
 
 likely = 0.6  # occlusion likelihood
@@ -47,6 +48,8 @@ if dataset == 'robin':
 	categories_train.remove('bottle')
 	categories = categories_train
 else: robin_cats = ['']
+if robin_all:
+    robin_cats = ['']
 
 def test(models, test_data, batch_size):
 	test_loader = DataLoader(dataset=test_data, batch_size=batch_size, shuffle=True)
@@ -89,7 +92,7 @@ def test(models, test_data, batch_size):
 	return test_acc, scores
 
 
-def adapt(models, test_data, batch_size, robust_da, epochs=5, lr=1e-3):
+def adapt(models, test_data, batch_size, robust_da, epochs=10, lr=1e-6):
     test_loader = DataLoader(dataset=test_data, batch_size=batch_size, shuffle=True)
     print('Adapting')
     nclasses = 12 # models[0].num_classes
@@ -101,7 +104,7 @@ def adapt(models, test_data, batch_size, robust_da, epochs=5, lr=1e-3):
 
     if robust_da:
         #Batch Norm adapt
-        # robusta.batchnorm.adapt(models, adapt_type="batch_wise")
+        robusta.batchnorm.adapt(models, adapt_type="batch_wise")
         # self Learning
         parameters = robusta.selflearning.adapt(models, adapt_type="affine")
         optimizer = torch.optim.SGD(parameters, lr=lr)
@@ -131,6 +134,11 @@ def adapt(models, test_data, batch_size, robust_da, epochs=5, lr=1e-3):
             c_label = label.numpy()
 
             logits = models(input)
+            # print(logits.shape, logits[:,:11].shape)
+            # exit()
+            # if dataset in ['robin','pseudorobin'] and logits.shape[1]==12:
+            # predictions = logits[:,:11].argmax(dim=1)
+            # else:
             predictions = logits.argmax(dim=1)
             # print(predictions.cpu().data, c_label, logits.cpu().numpy(), "\n")
 
@@ -167,11 +175,15 @@ def adapt(models, test_data, batch_size, robust_da, epochs=5, lr=1e-3):
             # print(out, c_label, out.argmax())
             # scores = np.concatenate((scores,out))
             # out = out.argmax()
-            correct[c_label] += np.sum(out == c_label)
-
-            total_samples[c_label] += 1
-            if np.sum(total_samples)>=300:
-                break
+            if c_label.shape[0]>1:
+                for cl in range(len(categories)):
+                    correct[cl] += np.sum((out == c_label)*(c_label==cl))
+                    total_samples[cl] += np.sum(c_label==cl)
+            else:
+                correct[c_label] += np.sum(out == c_label)
+                total_samples[c_label] += 1
+            # if np.sum(total_samples)>=300:
+            #     break
 
         for i in range(nclasses):
             if total_samples[i]>0:
@@ -187,7 +199,7 @@ def adapt(models, test_data, batch_size, robust_da, epochs=5, lr=1e-3):
                     }
         save_checkpoint(best_check, 'baseline_models/{}_adapted_{}_{}.pth'.format(corr,backbone_type, dataset), True)
     # exit()
-    return test_acc, scores
+    return test_acc, scores, models
 
 if __name__ == '__main__':
 
@@ -209,7 +221,11 @@ if __name__ == '__main__':
     elif backbone_type=='vgg_bn':
         model = models.vgg16_bn(pretrained=True)
         model.classifier[6]  = torch.nn.Linear(4096, len(categories_train))
-    elif backbone_type=='resnet50' or backbone_type == 'resnet18' or backbone_type == 'resnext' or backbone_type=='densenet':
+    elif backbone_type=='resnet50':
+        model = models.resnet50(pretrained=True)
+        model.fc = torch.nn.Linear(model.fc.in_features, len(categories_train))
+        # model.fc = torch.nn.Linear(model.fc.in_features, 12)
+    elif backbone_type == 'resnet18' or backbone_type == 'resnext' or backbone_type=='densenet':
         raise NotImplementedError("baselines {} not implemented".format(backbone_type))
     else:
         raise(NotImplementedError)
@@ -223,6 +239,48 @@ if __name__ == '__main__':
 
     model.cuda().eval() #* IS THIS NEEDED?
 
+    ############################
+    # for occ_level in occ_levels:
+
+    #     if occ_level == 'ZERO':
+    #         occ_types = ['']
+    #     else:
+    #         if dataset=='pascal3d+':
+    #             occ_types = ['']#['_white','_noise', '_texture', '']
+    #         elif dataset=='coco':
+    #             occ_types = ['']
+
+    #     for index, occ_type in enumerate(occ_types):
+    #         # load images
+    #         if corr is not None:
+    #             print("Loading corrupted data\n")
+    #             test_imgs, test_labels, masks = getImg('test', categories_train, dataset,data_path, \
+    #                 categories, occ_level, occ_type,bool_load_occ_mask=True, determinate=True, corruption=corr)
+    #         else:
+    #             print("Loading clean data\n")
+    #             test_imgs, test_labels, masks = getImg('test', categories_train, dataset,data_path, \
+    #                 categories, occ_level, occ_type,bool_load_occ_mask=True)
+            
+    #         #* removing an image due to errors
+    #         if corr is not None:
+    #             errs = ['data/pascal3d+_occ_snow/carLEVELONE/n03770679_14513_2.JPEG', 'data/pascal3d+_occ_snow/carLEVELFIVE/n03770679_14513_2.JPEG', 'data/pascal3d+_occ_snow/carLEVELNINE/n03770679_14513_2.JPEG']
+    #             for es in errs:
+    #                 if es in test_imgs:
+    #                     idx_rm = test_imgs.index(es)
+    #                     del test_imgs[idx_rm]
+    #                     del test_labels[idx_rm]
+    #                     del masks[idx_rm]
+    #         #*
+
+    #         print('Total imgs for test of occ_level {} and occ_type {} '.format(occ_level, occ_type) + str(len(test_imgs)))
+    #         """test_imgs is list of image path and name strings"""
+    #         # get image loader
+    #         test_imgset = Imgset(test_imgs, masks, test_labels, imgLoader, bool_square_images=False)
+    #         # test_imgset = train_imgset
+    #         # compute test accuracy
+    #         acc, scores = test(models=model, test_data=test_imgset, batch_size=1)
+    #         out_str = 'Test Model Name: Occ_level:{}, Occ_type:{}, Acc:{}'.format(occ_level, occ_type, acc)
+    #         print(out_str)
     ############################
     # Adapt Loop
     ############################
@@ -248,8 +306,10 @@ if __name__ == '__main__':
                 else:
                     print("Loading clean data\n")
                     if dataset == 'robin':
-                        cat = [cat]
-                        # cat = None # for all categories
+                        if robin_all:
+                            cat = None # for all categories
+                        else:
+                            cat = [cat]
                         print("Loading {} subcategory\n".format(cat))
                         train_imgs, train_labels, train_masks = getImg('test', categories_train, dataset,data_path, \
                             categories, occ_level, occ_type,bool_load_occ_mask=True, subcat=cat)
@@ -273,10 +333,10 @@ if __name__ == '__main__':
                 # print('Total imgs for test of occ_level {} and occ_type {} '.format(occ_level, occ_type) + str(len(test_imgs)))
                 # """test_imgs is list of image path and name strings"""
                 # get image loader
-                train_imgset = Imgset(train_imgs,train_masks, train_labels, imgLoader,bool_square_images=False)
+                train_imgset = Imgset(train_imgs,train_masks, train_labels, imgLoader,bool_square_images=True)
                 # test_imgset = Imgset(test_imgs, masks, test_labels, imgLoader, bool_square_images=False)
                 # compute test accuracy
-                acc, scores = adapt(models=model, test_data=train_imgset, batch_size=1, robust_da=rbsta)
+                acc, scores, model = adapt(models=model, test_data=train_imgset, batch_size=64, robust_da=rbsta)
                 out_str = 'Adapt Model Name: Occ_level:{}, Occ_type:{}, Acc:{}'.format(occ_level, occ_type, acc)
                 print(out_str)
             
@@ -284,6 +344,7 @@ if __name__ == '__main__':
                 # out_str = 'Test Model Name: Occ_level:{}, Occ_type:{}, Acc:{}'.format(occ_level, occ_type, acc)
                 # print(out_str)
 
+model.cuda().eval()
 for occ_level in occ_levels:
 
     if occ_level == 'ZERO':
@@ -320,6 +381,7 @@ for occ_level in occ_levels:
         """test_imgs is list of image path and name strings"""
         # get image loader
         test_imgset = Imgset(test_imgs, masks, test_labels, imgLoader, bool_square_images=False)
+        # test_imgset = train_imgset
         # compute test accuracy
         acc, scores = test(models=model, test_data=test_imgset, batch_size=1)
         out_str = 'Test Model Name: Occ_level:{}, Occ_type:{}, Acc:{}'.format(occ_level, occ_type, acc)

@@ -15,10 +15,10 @@ import numpy as np
 import math
 import torch
 
-DA = False#True
+DA = True
 corr = None#'snow'  # 'snow'
-mode = None#'mixed'#'corres'  # * mixed: vc- corrupted, mixture - clean; '': vc and mix - corrupted;reverse:
-           # * reverse: vc-clean, mix-corrupt; None, 'corres': correspondence dict b/w clean and corr VCs
+mode = ''#'corres', None  # * mixed: vc- corrupted, mixture - clean; '': vc and mix - corrupted;reverse:
+           # * reverse: vc-clean, mix-corrupt; None; 'corres': correspondence dict b/w clean and corr VCs
 paral_num = 10
 nimg_per_cat = 5000
 imgs_par_cat = np.zeros(len(categories))
@@ -66,7 +66,7 @@ for category in categories:  # * loading individual class categories
     if DA and mode not in ['mixed', 'corres']:
         print("Loading corrupted data")
         if dataset=='robin':
-            imgs, labels, masks = getImg('test', categories, dataset, data_path, cat_test, \
+            imgs, labels, masks = getImg('test', categories, dataset, data_path, [category], \
                 occ_level, occ_type, bool_load_occ_mask=False, subcat=cat) 
         else:
             imgs, labels, masks = getImg('train', [category], dataset, data_path, cat_test,\
@@ -125,6 +125,7 @@ for category in categories:  # * loading individual class categories
         else:
             best_thresh = 0.45
         layer_feature_b = [None for nn in range(N)]
+        
         for nn in range(N):  # / using all images here?
             layer_feature_b[nn] = (r_set[nn] < best_thresh).astype(int).T
 

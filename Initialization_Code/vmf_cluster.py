@@ -17,13 +17,14 @@ import pickle
 
 u = UnNormalize()
 
-DA = False#True
+DA = True
 corr = None#'snow'  # 'snow'
 backgnd_corr = None # backgnd corruption - if None corr will be applied to entire image
 # cat  = [robin_cats[4]] #/ for individual sub-cats
 cat = None
 # offset = 2 #/ should
-vc_space = 3
+vc_space = 0#3
+retrain_vc = False#True
 
 img_per_cat = 1000  # image per category
 samp_size_per_img = 20
@@ -34,6 +35,7 @@ bins = 4
 occ_level = 'ZERO'
 occ_type = ''
 
+print("Dataset {}".format(dataset))
 if dataset == 'robin':
     categories.remove('bottle')
     cat_test = categories
@@ -42,9 +44,11 @@ if dataset == 'robin':
 #* imgs is the image paths array/list
 if DA:
     if dataset=='robin':
+        print("Loading {} test data".format(dataset))
         imgs, labels, masks = getImg('test', categories, dataset, data_path, cat_test, \
             occ_level, occ_type, bool_load_occ_mask=False, subcat=cat)    
     else:
+        print("Loading {} train data".format(dataset))
         imgs, labels, masks = getImg('train', categories, dataset, data_path, cat_test, \
             occ_level, occ_type, bool_load_occ_mask=False, determinate=True, corruption=corr, corr_bck=backgnd_corr)
 else:
@@ -178,7 +182,18 @@ loc_set = np.asarray(loc_set).T  # * [6, 48050]
 
 print(feat_set.shape)
 model = vMFMM(vc_num, 'k++')  # * k-means clustering - finding means and saving them in a pickle file
-model.fit(feat_set, vMF_kappa, max_it=150)
+if not retrain_vc:
+    model.fit(feat_set, vMF_kappa, max_it=150)
+else:
+    print("RETRAINING VCs\n")
+    with open('models_robin_all/init_vgg_bn/dictionary_vgg_bn/dictionary_pool5_512.pickle', 'rb') as fh:
+        prev_mu = pickle.load(fh)
+    with open('models_robin_all/init_vgg_bn/dictionary_vgg_bn/dictionary_pool5_512_p.pickle', 'rb') as fh:
+        prev_p = pickle.load(fh)
+    prev_pi = np.sum(prev_p, axis=0)/prev_p.shape[0]
+    model.fit_soft(features=feat_set, p=prev_p, mu=prev_mu, pi=prev_pi, kappa=vMF_kappa, max_it=150)
+    del(prev_p, prev_mu, prev_pi)
+
 if DA:
     with open(da_dict_dir+'dictionary_{}_{}.pickle'.format(layer, vc_num), 'wb') as fh:
         pickle.dump(model.mu, fh)

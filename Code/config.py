@@ -85,8 +85,8 @@ _C = config     # short alias to avoid coding
 # Experiment name
 _C.NAME = 'default'
 
-# options: 'pascal3d+', 'mnist', 'cifar10', 'coco', 'robin'
-_C.DATA.DATASET = 'pascal3d+'
+# options: 'pascal3d+', 'mnist', 'cifar10', 'coco', 'robin', pseudorobin
+_C.DATA.DATASET = 'robin'
 # categories for testing (vehicles only)
 _C.DATA.CATEGORY = ['aeroplane', 'bicycle', 'bus', 'car', 'motorbike', 'train']
 # categories for training
@@ -111,9 +111,9 @@ _C.MODEL.MIXTURE_NUM = 4 # number of mixture models per class
 # 'second' if _C.MODEL.BACKBONE_TYPE is 'resnet50', 'resnext'. None
 # means default layer, i.e. 'pool5' for 'vgg' and 'last' for 'resnet50',
 # 'resnext', 'densenet'.
-_C.MODEL.LAYER = 'pool4'#'pool5'
+_C.MODEL.LAYER = 'pool5'#'pool5','last'
 # options: 'vgg', 'resnet50', 'resnext'
-_C.MODEL.BACKBONE_TYPE = 'vgg'
+_C.MODEL.BACKBONE_TYPE = 'vgg' #'vgg', 'resnet50
 
 ###############################################################################
 # Training configs

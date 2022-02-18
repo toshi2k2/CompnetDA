@@ -38,9 +38,9 @@ class Net(nn.Module):
         self.compnet_type = compnet_type
         self.num_mixtures = num_mixtures
         self.num_classes = mix_model.shape[0]//num_mixtures
-        self.mix_model = torch.nn.Parameter(mix_model)
+        self.mix_model = torch.nn.Parameter(mix_model) #/ 4 mixtures per class
         self.use_mixture_bg = bool_mixture_bg
-        self.conv1o1 = Conv1o1Layer(weights, vc_neigh=vc_sp)
+        self.conv1o1 = Conv1o1Layer(weights, vc_neigh=vc_sp) #/ Convolves features with VCs
         self.activation_layer = ActivationLayer(vMF_kappa, compnet_type,
                                                 threshold=vc_thresholds)
 
@@ -208,8 +208,9 @@ class PointwiseInferenceLayer(nn.Module):
         # Compute foreground score, after reshape, the shape will be (n_batch,
         # n_class, n_mixture, height, width)
         if self.compnet_type == 'vmf':
+            # suming over 3-D tensor - individual contribution of each vc per pixel location
             foreground = torch.log(
-                (input.unsqueeze(1) * mm).sum(2) * (1 - occ_likely) + 1e-10) # suming over 3-D tensor - individual contribution of each vc per pixel location
+                (input.unsqueeze(1) * mm).sum(2) * (1 - occ_likely) + 1e-10) 
         # mm is mixture model
         elif self.compnet_type == 'bernoulli':
             obj_zero = torch.log(1.0-torch.exp(mm))
@@ -352,6 +353,16 @@ def resnet_feature_extractor(type, layer='last'):
     extractor = nn.Sequential()
     if type == 'resnet50':
         net = models.resnet50(pretrained=True)
+
+        # print("Loading robin trained model")
+        # net.fc = torch.nn.Linear(net.fc.in_features, 12)
+        # path = 'baseline_models/ROBIN-train-resnet50.pth'
+        # if device_ids:
+        #     load_dict = torch.load(path, map_location='cuda:{}'.format(0))
+        # else:
+        #     load_dict = torch.load(path, map_location='cpu')
+        # net.load_state_dict(load_dict['state_dict'])
+
         if layer == 'last':
             extractor.add_module('0', net.conv1)
             extractor.add_module('1', net.bn1)

@@ -1,3 +1,4 @@
+from pickle import load
 import numpy as np
 import scipy
 if tuple(map(int, scipy.__version__.split('.'))) < (1, 0, 0):
@@ -15,9 +16,10 @@ def normalize_features(features):
 	return features/norma
 
 class vMFMM:
-	def __init__(self, cls_num, init_method = 'random'):
+	def __init__(self, cls_num, init_method = 'random', load_vc=None):
 		self.cls_num = cls_num # 512- vc_num
 		self.init_method = init_method
+		self.load_vc = load_vc
 
 
 	def fit(self, features, kappa, max_it=300, tol = 5e-5, normalized=False, verbose=True):
@@ -29,7 +31,7 @@ class vMFMM:
 		self.kappa = kappa #/ What is this?
 
 		self.pi = np.random.random(self.cls_num)
-		self.pi /= np.sum(self.pi) #/ pi nows sums to one - membership of each vc?
+		self.pi /= np.sum(self.pi) #/ pi nows sums to one - membership of each vc? - mixture proportion?
 		if self.init_method =='random':
 			self.mu = np.random.random((self.cls_num, self.d))
 			self.mu = normalize_features(self.mu)
@@ -57,6 +59,13 @@ class vMFMM:
 
 			self.mu = np.array(centers) #* [512, 512] i.e. 512 1D features of length 512
 			del(cos_dis)
+		# elif self.init_method =='update':
+		# 	#/ Load old VCs and update them with new data
+		# 	assert(self.load_vc is not None)
+		# 	with open(self.load_vc['mu'], 'rb') as fh:
+		# 		self.mu = load(fh)
+		# 	with open(self.load_vc['p'], 'rb') as fh:
+		# 		self.p = load(fh)
 
 		self.mllk_rec = [] #/ IS THIS MAXIMUM LIKELIHOOD?
 		for itt in range(max_it):
@@ -67,7 +76,7 @@ class vMFMM:
 
 			self.mllk_rec.append(self.mllk)
 			if len(self.mllk_rec)>1 and self.mllk - self.mllk_rec[-2] < tol:
-				#print("early stop at iter {0}, llk {1}".format(itt, self.mllk))
+				if verbose:print("early stop at iter {0}, llk {1}".format(itt, self.mllk))
 				break
 
 
@@ -83,13 +92,15 @@ class vMFMM:
 
 		self.n, self.d = self.features.shape
 
+		self.mllk_rec = []
 		for itt in range(max_it):
+			if verbose and itt%10:print("EM Step:{}\{}".format(itt+1,max_it))
 			self.e_step()
 			self.m_step()
 
 			self.mllk_rec.append(self.mllk)
 			if len(self.mllk_rec)>1 and self.mllk - self.mllk_rec[-2] < tol:
-				#print("early stop at iter {0}, llk {1}".format(itt, self.mllk))
+				if verbose:print("early stop at iter {0}, llk {1}".format(itt, self.mllk))
 				break
 
 
@@ -97,8 +108,8 @@ class vMFMM:
 		# update p
 		logP = np.dot(self.features, self.mu.T)*self.kappa + np.log(self.pi).reshape(1,-1)  # n by k
 		logP_norm = logP - logsumexp(logP, axis=1).reshape(-1,1)
-		self.p = np.exp(logP_norm)
-		self.mllk = np.mean(logsumexp(logP, axis=1))
+		self.p = np.exp(logP_norm) #/ posterior
+		self.mllk = np.mean(logsumexp(logP, axis=1)) #/mean likelihood
 
 
 	def m_step(self):
