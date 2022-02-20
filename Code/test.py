@@ -16,6 +16,7 @@ from model import resnet_feature_extractor
 import tqdm
 import torchvision.models as models
 from Initialization_Code.config_initialization import robin_cats
+import pickle
 
 import torchvision
 u = UnNormalize()
@@ -33,11 +34,11 @@ DA = True#False
 test_orig = True#False  #* test compnets with clean images
 corr = None#'snow'  # 'snow'
 vc_space = 0#2,3 # default=0
-save_scores = True
+save_scores = False#True
 save_pseudo_image_list = False#True #!only implemented for one occlusion level
 
 # dataset= 'robin'#'pascal3d+'
-backbone_type = 'vgg_bn' #'vgg_bn
+backbone_type = 'vgg_tr' #'vgg_bn
 da_dict_dir = 'models/da_init_{}/dictionary_{}/dictionary_{}_512.pickle'.format(backbone_type, backbone_type, layer)
 da_mix_model_path = 'models/da_init_{}/mix_model_vmf_{}_EM_all'.format(backbone_type,dataset)
 dict_dir = 'models/init_{}/dictionary_{}/dictionary_{}_512.pickle'.format(backbone_type,backbone_type, layer)
@@ -69,6 +70,7 @@ def test(models, test_data, batch_size):
     total_samples = np.zeros(nclasses)
     scores = np.zeros((0,nclasses))
     real_labels = []
+    pseudo_img_pth, pseudo_labels = [], []
 
     with torch.no_grad():
         for i, data in enumerate(tqdm.tqdm(test_loader)):
@@ -96,10 +98,15 @@ def test(models, test_data, batch_size):
             #     print(e, input.shape)
             #     continue
             out = output.cpu().numpy()
+            temp = out
 
             scores = np.concatenate((scores, out))
             out = out.argmax(1)
             correct[c_label] += np.sum(out == c_label)
+
+            if np.max(temp)>0.5:
+                pseudo_img_pth.append(test_data.images[i])
+                pseudo_labels.append(out)
             # if out!= c_label and c_label == 5:
             #     im = torchvision.transforms.functional.to_pil_image(u(input[0]))
             #     im.save('results/fails/car_incorrect_%s_%s.png' % (corr, i))
@@ -112,7 +119,13 @@ def test(models, test_data, batch_size):
             print('Class {}: {:1.3f}'.format(categories_train[i],correct[i]/total_samples[i]))
     test_acc = (np.sum(correct)/np.sum(total_samples))
     if save_scores:
-        np.savez('{}_{}_da_{}.npz'.format(dataset, backbone_type, DA), scores, np.array(real_labels))
+        np.savez('{}_{}_2da_{}.npz'.format(dataset, backbone_type, DA), scores, np.array(real_labels))
+    if save_pseudo_image_list:
+        print("Total number of pseudo images = {} ({}%)".format(len(pseudo_img_pth), len(pseudo_img_pth)/sum(total_samples)))
+        # np.savez('image_list_{}_da_{}.npz'.format(dataset, DA), np.array(pseudo_img_pth), np.array(pseudo_labels))
+        with open("{}_psuedo2_img.pickle".format(dataset), 'wb') as fh:
+            # print('saving at: '+savename)
+            pickle.dump([pseudo_img_pth, pseudo_labels], fh)
     return test_acc, scores
 
 if __name__ == '__main__':

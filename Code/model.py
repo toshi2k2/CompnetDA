@@ -195,7 +195,7 @@ class PointwiseInferenceLayer(nn.Module):
 
         # After this line, mm.shape should be (num_class*num_mixtures,
         # num_channels, height, width)
-        mm = ops.crop_or_pad_as(mm, input, pad_val=self.const_pad_val)
+        mm = ops.crop_or_pad_as(mm, input, pad_val=self.const_pad_val) #/ cropping mixtures to match size of features
 
         if self.use_mixture_bg:
             background = torch.max(background, dim=1, keepdims=True)[0]
@@ -208,7 +208,7 @@ class PointwiseInferenceLayer(nn.Module):
         # Compute foreground score, after reshape, the shape will be (n_batch,
         # n_class, n_mixture, height, width)
         if self.compnet_type == 'vmf':
-            # suming over 3-D tensor - individual contribution of each vc per pixel location
+            # summing over 3-D tensor - individual contribution of each vc per pixel location
             foreground = torch.log(
                 (input.unsqueeze(1) * mm).sum(2) * (1 - occ_likely) + 1e-10) 
         # mm is mixture model
@@ -234,8 +234,8 @@ class PointwiseInferenceLayer(nn.Module):
         if not self.bool_occ:
             background *= -np.inf
         # n_batch, n_class, n_mixture, n_clutter
-        per_model_score = torch.max(foreground, background).sum((-1, -2))
-        scores = per_model_score.max(axis=-1)[0].max(axis=-1)[0]
+        per_model_score = torch.max(foreground, background).sum((-1, -2)) #/ summing over last 2 dimensions (A 2D array to single value)
+        scores = per_model_score.max(axis=-1)[0].max(axis=-1)[0] #/taking max value amongst the clutter and then max amongst mixtures of each class
         return scores
 
 

@@ -35,14 +35,14 @@ DA = True#False
 test_orig = True#False  #* test compnets with clean images
 corr = None#'snow'  # 'snow'
 vc_space = 0#2,3 # default=0
-vc_space2 = 3 # default=0
+vc_space2 = 0#3 # default=0
 save_scores = False#True #!only implemented for one occlusion level
-save_pseudo_image_list = True #!only implemented for one occlusion level
+save_pseudo_image_list = False#True #!only implemented for one occlusion level
 
-dataset= 'robin'#'pascal3d+'
+dataset= 'pseudorobin'#'pascal3d+'
 backbone_type = 'vgg_bn' #'vgg_bn
-da_dict_dir = 'models_robin_all/da_init_{}/dictionary_vgg_bn/dictionary_pool5_512.pickle'.format(backbone_type)
-da_mix_model_path = 'models_robin_all/da_init_{}/mix_model_vmf_{}_EM_all'.format(backbone_type,dataset)
+da_dict_dir = 'models/da_init_{}/dictionary_vgg_bn/dictionary_pool5_512.pickle'.format(backbone_type)
+da_mix_model_path = 'models/da_init_{}/0_mix_model_vmf_{}_EM_all'.format(backbone_type,dataset)
 dict_dir = 'models_snow_bn/init_{}/dictionary_{}/dictionary_pool5_512.pickle'.format(backbone_type,backbone_type)
 # dict_dir = 'models_old/init_{}/dictionary_{}/dictionary_pool5.pickle'.format(backbone_type,backbone_type)
 mix_model_path = 'models_snow_bn/init_{}/mix_model_vmf_{}_EM_all'.format(backbone_type,dataset)
@@ -50,8 +50,9 @@ mix_model_path = 'models_snow_bn/init_{}/mix_model_vmf_{}_EM_all'.format(backbon
 
 dataset = 'robin'
 
-da_dict_dir2 = 'models_robin_all_3x3/da_init_vgg_bn/dictionary_vgg_bn/dictionary_pool5_512.pickle'
-da_mix_model_path2 = 'models_robin_all_3x3/da_init_{}/mix_model_vmf_{}_EM_all'.format(backbone_type,dataset)
+# da_dict_dir2 = 'models_robin_all_3x3/da_init_vgg_bn/dictionary_vgg_bn/dictionary_pool5_512.pickle'
+da_dict_dir2 = da_dict_dir
+da_mix_model_path2 = 'models/da_init_{}/mix_model_vmf_{}_EM_all_og'.format(backbone_type,dataset)
 dict_dir2 = 'models_snow_bn/init_{}/dictionary_{}/dictionary_pool5_512.pickle'.format(backbone_type,backbone_type)
 mix_model_path2 = 'models_snow_bn/init_{}/mix_model_vmf_{}_EM_all'.format(backbone_type,dataset)
 
@@ -102,6 +103,9 @@ def test(models, models2, test_data, batch_size):
             scores = np.concatenate((scores, out))
             scores2 = np.concatenate((scores2, out2))
 
+            st1 = np.argpartition(out[0], -2)[-2:]
+            st2 = np.argpartition(out2[0], -2)[-2:] 
+
             if out.argmax(1)==out2.argmax(1):
                 
                 # if save_pseudo_image_list:
@@ -118,6 +122,24 @@ def test(models, models2, test_data, batch_size):
                 if out==c_label:
                     pseudo_img_pth.append(test_data.images[i])
                     pseudo_labels.append(out)
+            # elif np.intersect1d(st1,st2).size!=0:
+            #     if np.intersect1d(st1,st2).size == 2:
+            #         if out.max(1)>out2.max(1):
+            #             out = out.argmax(1)
+            #         else:
+            #             out = out2.argmax(1)
+            #         # tm0, tm1 =np.intersect1d(st1,st2)
+            #         # # print(out[tm0]+out2[tm0])
+            #         # if out[0,tm0]+out2[0,tm0]>out[0,tm1]+out2[0,tm1]:
+            #         #     out = tm0
+            #         # else: out = tm1
+            #     else:
+            #         out = np.intersect1d(st1,st2)
+            #         # out2 = out2.argmax(1)
+            #     correct[c_label] += np.sum(out == c_label)
+            #     if out==c_label:
+            #         pseudo_img_pth.append(test_data.images[i])
+            #         pseudo_labels.append(out)
             else:
                 # if out.max(axis=1)>0.3:
                 #     if out.argmax(1)!=5: #chair

@@ -21,7 +21,7 @@ if dataset == 'robin':
 savename = 'data/Robin/cls_pseudo_test_all' #/For all subcats combined
 # outfile = './image_list_robin_da_True.npz'
 # outfile = './robin_all_psuedo_img2.pickle'
-outfile = './robin_resnet50_dapsuedo_img2.pickle'
+outfile = './robin_psuedo_img.pickle'
 # filez = np.load(outfile)
 # filez.files
 # img_pth = filez['arr_0']

@@ -91,7 +91,7 @@ def getCompositionModel(device_id,mix_model_path,layer,categories,compnet_type='
 		mix_models.append(torch.from_numpy(mix).type(torch.FloatTensor))
 		msz.append(mix.shape)
 
-	maxsz = np.max(np.asarray(msz),0)
+	maxsz = np.max(np.asarray(msz),0) #/ max of each dimension shape of all mixtures
 	maxsz[2:4] = maxsz[2:4] + (np.mod(maxsz[2:4], 2) == 0)
 	if layer == 'pool4' and compnet_type=='vmf':
 		# Need to cut down the model to enable training

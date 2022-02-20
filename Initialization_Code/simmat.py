@@ -19,7 +19,7 @@ import torch
 
 DA = True
 corr = None#'snow'  # 'snow'
-mode = ''#'corres'  # * mixed: vc- corrupted, mixture - clean; '': vc and mix - corrupted;reverse:
+mode = 'mixed'#'corres'  # * mixed: vc- corrupted, mixture - clean; '': vc and mix - corrupted;reverse:
            # * reverse: vc-clean, mix-corrupt; None, 'corres': correspondence dict b/w clean and corr VCs
 vc_space = 0#3
 ignore_edge = False#True # ignore edge of layer output - to reduce comptuations

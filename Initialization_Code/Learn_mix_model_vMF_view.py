@@ -17,7 +17,7 @@ import matplotlib.pyplot as plt
 import scipy.io as sio
 
 DA = True
-mode = '' # '', mixed, None, corres
+mode = 'mixed' # '', mixed, None, corres
 corr = None #'snow'  #'snow'
 vc_space = 0#3
 
