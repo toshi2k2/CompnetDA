@@ -1,6 +1,8 @@
 #! Taking bigger spatial size for VCs
 
 import os, sys
+
+from cv2 import add
 p = os.path.abspath('.')
 sys.path.insert(1, p)
 from Code.vMFMM import *
@@ -13,7 +15,7 @@ import torchvision
 from torch.utils.data import DataLoader
 import cv2
 import glob
-import pickle
+import pickle, random
 
 u = UnNormalize()
 
@@ -25,8 +27,12 @@ cat = None
 # offset = 2 #/ should
 vc_space = 0#3
 retrain_vc = False#True
+add_data = True
+frc = 0.6
 
 img_per_cat = 1000  # image per category
+if add_data:
+    img_per_cat+=int(img_per_cat*frc)
 samp_size_per_img = 20
 imgs_par_cat =np.zeros(len(categories))
 bool_load_existing_cluster = False
@@ -52,8 +58,24 @@ if DA:
         imgs, labels, masks = getImg('train', categories, dataset, data_path, cat_test, \
             occ_level, occ_type, bool_load_occ_mask=False, determinate=True, corruption=corr, corr_bck=backgnd_corr)
 else:
+    print("Loading {} train data".format(dataset))
     imgs, labels, masks = getImg('train', categories, dataset, data_path, cat_test, \
     occ_level, occ_type, bool_load_occ_mask=False)
+#/############################################
+if add_data:
+    assert(dataset=='robin')
+    print("Adding clean data from robin train!")
+    imgs2, labels2, masks2 = getImg('train', categories, 'robin', data_path, cat_test, \
+        occ_level, occ_type, bool_load_occ_mask=False)
+    temp_list = list(zip(imgs2, labels2, masks2))
+    sampled = random.sample(temp_list, int(min(len(imgs), len(imgs2))*frc))
+    imgs+=[i for (i,l,m) in sampled]
+    labels+=[l for (i,l,m) in sampled]
+    masks+=[m for (i,l,m) in sampled] 
+    # imgs+=random.sample(imgs2, int(min(len(imgs), len(imgs2))*frc))
+    # labels+=labels2[:int(min(len(labels), len(labels2))*frc)]
+    # masks+=masks2[:int(min(len(masks), len(masks2))*frc)]
+#/#########################################
 imgset = Imgset(imgs, masks, labels, imgLoader, bool_square_images=False)
 data_loader = DataLoader(dataset=imgset, batch_size=1, shuffle=False)
 nimgs = len(imgs)

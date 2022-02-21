@@ -9,8 +9,8 @@ data_path = 'data/'
 model_save_dir = 'models/'
 
 dataset = 'robin' # pascal3d+, coco, robin, pseudorobin
-nn_type = 'resnet50' #vgg, vgg_bn, vgg_tr, resnet50, resnext, resnet152
-vMF_kappa=10#30
+nn_type = 'vgg_bn' #vgg, vgg_bn, vgg_tr, resnet50, resnext, resnet152
+vMF_kappa=30
 vc_num = 512
 vc_shape = 0#0
 

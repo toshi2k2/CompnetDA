@@ -11,15 +11,19 @@ from config_initialization import vc_num, dataset, categories, data_path, \
             da_dict_dir, da_init_path, robin_cats
 from Code.helpers import getImg, imgLoader, Imgset
 from torch.utils.data import DataLoader
-import cv2
+import cv2, random
 import gc
 import matplotlib.pyplot as plt
 import scipy.io as sio
+from Code.config import num_mixtures
 
 DA = True
 mode = 'mixed' # '', mixed, None, corres
 corr = None #'snow'  #'snow'
 vc_space = 0#3
+num_layers=2
+cluster_perlayer = num_mixtures//num_layers
+add_data = False # add data to current data
 
 if dataset in ['robin','pseudorobin']:
     categories.remove('bottle')
@@ -72,6 +76,14 @@ def learn_mix_model_vMF(category,num_layers = 2,num_clusters_per_layer = 2,frac_
         print("Loading clean data")
         imgs, labels, masks = getImg('train', [category], dataset, data_path, cat_test, \
             occ_level, occ_type, bool_load_occ_mask=False)
+    if add_data:
+        print("Adding clean data from robin train!")
+        frc = 0.5
+        imgs2, labels2, masks2 = getImg('train', [category], 'robin', data_path, cat_test, \
+            occ_level, occ_type, bool_load_occ_mask=False)
+        imgs+=random.sample(imgs2, int(min(len(imgs), len(imgs2))*frc))
+        labels+=labels2[:int(min(len(labels), len(labels2))*frc)]
+        masks+=masks2[:int(min(len(masks), len(masks2))*frc)]
     # similarity matrix
     if DA or mode == 'mixed':
         print("loading DA similarity matrix")
@@ -378,7 +390,7 @@ def learn_mix_model_vMF(category,num_layers = 2,num_clusters_per_layer = 2,frac_
 
 if __name__=='__main__':
     for category in categories:
-        for num_layers in [2]:
-            learn_mix_model_vMF(category,num_layers=num_layers,num_clusters_per_layer=2)
+        # for num_layers in [2]:
+        learn_mix_model_vMF(category,num_layers=num_layers,num_clusters_per_layer=cluster_perlayer)
 
     print('DONE')

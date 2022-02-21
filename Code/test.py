@@ -37,8 +37,8 @@ vc_space = 0#2,3 # default=0
 save_scores = False#True
 save_pseudo_image_list = False#True #!only implemented for one occlusion level
 
-# dataset= 'robin'#'pascal3d+'
-backbone_type = 'vgg_tr' #'vgg_bn
+dataset= 'robin'#'pascal3d+'
+backbone_type = 'vgg_bn' #'vgg_bn
 da_dict_dir = 'models/da_init_{}/dictionary_{}/dictionary_{}_512.pickle'.format(backbone_type, backbone_type, layer)
 da_mix_model_path = 'models/da_init_{}/mix_model_vmf_{}_EM_all'.format(backbone_type,dataset)
 dict_dir = 'models/init_{}/dictionary_{}/dictionary_{}_512.pickle'.format(backbone_type,backbone_type, layer)

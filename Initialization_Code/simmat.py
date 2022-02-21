@@ -14,7 +14,7 @@ from config_initialization import vc_num, dataset, categories, data_path, \
 from Code.helpers import getImg, imgLoader, Imgset, myresize
 from torch.utils.data import DataLoader
 import numpy as np
-import math
+import math, random
 import torch
 
 DA = True
@@ -23,6 +23,7 @@ mode = 'mixed'#'corres'  # * mixed: vc- corrupted, mixture - clean; '': vc and m
            # * reverse: vc-clean, mix-corrupt; None, 'corres': correspondence dict b/w clean and corr VCs
 vc_space = 0#3
 ignore_edge = False#True # ignore edge of layer output - to reduce comptuations
+add_data = False # add data to current data
 
 paral_num = 10
 nimg_per_cat = 5000
@@ -82,6 +83,14 @@ for category in categories:  # * loading individual class categories
         imgs, labels, masks = getImg('train', [category], dataset, data_path, cat_test, \
             occ_level, occ_type, bool_load_occ_mask=False)
     imgs = imgs[:nimg_per_cat]
+    if add_data:
+        print("Adding clean data from robin train!")
+        frc = 0.5
+        imgs2, labels2, masks2 = getImg('train', [category], 'robin', data_path, cat_test, \
+            occ_level, occ_type, bool_load_occ_mask=False)
+        imgs+=random.sample(imgs2, int(min(len(imgs), len(imgs2))*frc))
+        labels+=labels2[:int(min(len(labels), len(labels2))*frc)]
+        masks+=masks2[:int(min(len(masks), len(masks2))*frc)]
     N = len(imgs)
     ## HERE
     # imgset = Imgset(imgs, masks, labels, imgLoader, bool_square_images=False,bool_cutout=False,\

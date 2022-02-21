@@ -103,7 +103,7 @@ _C.GPUS = None
 
 _C.MODEL.OCC_TYPES = ['_white', '_noise', 'general']
 _C.MODEL.COMPNET_TYPE = 'vmf'  # options: 'bernoulli','vmf'
-_C.MODEL.VMF_KAPPA = 10#30 # variance of vMF distribution
+_C.MODEL.VMF_KAPPA = 30 # variance of vMF distribution
 _C.MODEL.VC_NUM = 512 # number of vMF kernels
 _C.MODEL.VC_THRESHOLD = 0.0 # this threshold would be needed if you would like to implement CompNets with Bernoulli distributions (see our WACV'20 paper)
 _C.MODEL.MIXTURE_NUM = 4 # number of mixture models per class
@@ -111,9 +111,9 @@ _C.MODEL.MIXTURE_NUM = 4 # number of mixture models per class
 # 'second' if _C.MODEL.BACKBONE_TYPE is 'resnet50', 'resnext'. None
 # means default layer, i.e. 'pool5' for 'vgg' and 'last' for 'resnet50',
 # 'resnext', 'densenet'.
-_C.MODEL.LAYER = 'last'#'pool5','last'
+_C.MODEL.LAYER = 'pool5'#'pool5','last'
 # options: 'vgg', 'resnet50', 'resnext'
-_C.MODEL.BACKBONE_TYPE = 'resnet50' #'vgg', 'resnet50
+_C.MODEL.BACKBONE_TYPE = 'vgg' #'vgg', 'resnet50
 
 ###############################################################################
 # Training configs
