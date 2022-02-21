@@ -22,13 +22,13 @@ u = UnNormalize()
 DA = True
 corr = None#'snow'  # 'snow'
 backgnd_corr = None # backgnd corruption - if None corr will be applied to entire image
-# cat  = [robin_cats[4]] #/ for individual sub-cats
-cat = None
+cat  = [robin_cats[4]] #/ for individual sub-cats
+# cat = None
 # offset = 2 #/ should
 vc_space = 0#3
 retrain_vc = False#True
-add_data = True
-frc = 0.6
+add_data = False
+frc = 0.9
 
 img_per_cat = 1000  # image per category
 if add_data:

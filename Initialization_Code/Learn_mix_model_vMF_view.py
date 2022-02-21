@@ -28,8 +28,8 @@ add_data = False # add data to current data
 if dataset in ['robin','pseudorobin']:
     categories.remove('bottle')
     cat_test = categories
-    # cat = [robin_cats[0]]
-    cat = None
+    cat = [robin_cats[4]]
+    # cat = None
 
 if DA and mode in ['corres']:
     print("Loading CORRESPONDENCE Vmf Kernels")

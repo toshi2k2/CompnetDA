@@ -36,8 +36,8 @@ print('{} max_images {}'.format(dataset, nimg_per_cat))
 if dataset in ['robin','pseudorobin']:
     categories.remove('bottle')
     cat_test = categories
-    # cat = [robin_cats[0]]
-    cat = None
+    cat = [robin_cats[4]]
+    # cat = None
 
 if DA or mode in ['mixed', '', 'reverse']:
     if not os.path.exists(da_sim_dir):

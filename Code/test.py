@@ -24,8 +24,8 @@ u = UnNormalize()
 if dataset in ['robin', 'pseudorobin']:
     categories_train.remove('bottle')
     categories = categories_train
-    # cat = [robin_cats[4]]
-    cat = None
+    cat = [robin_cats[4]]
+    # cat = None
     print("Testing Sub-Category(ies) {}\n".format(cat))
 else:
     cat = None
