@@ -22,8 +22,8 @@ u = UnNormalize()
 DA = True
 corr = None#'snow'  # 'snow'
 backgnd_corr = None # backgnd corruption - if None corr will be applied to entire image
-cat  = [robin_cats[4]] #/ for individual sub-cats
-# cat = None
+# cat  = [robin_cats[0]] #/ for individual sub-cats
+cat = None
 # offset = 2 #/ should
 vc_space = 0#3
 retrain_vc = False#True
@@ -72,9 +72,9 @@ if add_data:
     imgs+=[i for (i,l,m) in sampled]
     labels+=[l for (i,l,m) in sampled]
     masks+=[m for (i,l,m) in sampled] 
-    # imgs+=random.sample(imgs2, int(min(len(imgs), len(imgs2))*frc))
-    # labels+=labels2[:int(min(len(labels), len(labels2))*frc)]
-    # masks+=masks2[:int(min(len(masks), len(masks2))*frc)]
+    # imgs+=imgs2
+    # labels+=labels2
+    # masks+=masks2
 #/#########################################
 imgset = Imgset(imgs, masks, labels, imgLoader, bool_square_images=False)
 data_loader = DataLoader(dataset=imgset, batch_size=1, shuffle=False)

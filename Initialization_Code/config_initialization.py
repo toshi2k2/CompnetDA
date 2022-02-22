@@ -9,12 +9,13 @@ data_path = 'data/'
 model_save_dir = 'models/'
 
 dataset = 'robin' # pascal3d+, coco, robin, pseudorobin
-nn_type = 'vgg_bn' #vgg, vgg_bn, vgg_tr, resnet50, resnext, resnet152
+nn_type = 'resnet50' #vgg, vgg_bn, vgg_tr, resnet50, resnext, resnet152
 vMF_kappa=30
 vc_num = 512
 vc_shape = 0#0
 
-# categories = ['tvmonitor']
+# categories = ['aeroplane', 'bicycle', 'boat', 'bottle', 'bus', 'car', 'chair', 'diningtable', 'motorbike', 'sofa',
+# 			  'train']
 categories = ['aeroplane', 'bicycle', 'boat', 'bottle', 'bus', 'car', 'chair', 'diningtable', 'motorbike', 'sofa',
 			  'train', 'tvmonitor']
 cat_test = ['aeroplane', 'bicycle', 'bus', 'car', 'motorbike', 'train']

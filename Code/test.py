@@ -24,21 +24,21 @@ u = UnNormalize()
 if dataset in ['robin', 'pseudorobin']:
     categories_train.remove('bottle')
     categories = categories_train
-    cat = [robin_cats[4]]
+    cat = [robin_cats[0]]
     # cat = None
     print("Testing Sub-Category(ies) {}\n".format(cat))
 else:
     cat = None
 
-DA = True#False
+DA = True
 test_orig = True#False  #* test compnets with clean images
 corr = None#'snow'  # 'snow'
 vc_space = 0#2,3 # default=0
-save_scores = False#True
-save_pseudo_image_list = False#True #!only implemented for one occlusion level
+save_scores = True
+save_pseudo_image_list = True #!only implemented for one occlusion level
 
-dataset= 'robin'#'pascal3d+'
-backbone_type = 'vgg_bn' #'vgg_bn
+# dataset= 'robin'#'pascal3d+'
+# backbone_type = 'vgg_bn' #'vgg_bn
 da_dict_dir = 'models/da_init_{}/dictionary_{}/dictionary_{}_512.pickle'.format(backbone_type, backbone_type, layer)
 da_mix_model_path = 'models/da_init_{}/mix_model_vmf_{}_EM_all'.format(backbone_type,dataset)
 dict_dir = 'models/init_{}/dictionary_{}/dictionary_{}_512.pickle'.format(backbone_type,backbone_type, layer)
@@ -104,7 +104,7 @@ def test(models, test_data, batch_size):
             out = out.argmax(1)
             correct[c_label] += np.sum(out == c_label)
 
-            if np.max(temp)>0.5:
+            if np.max(temp)>=0.4:
                 pseudo_img_pth.append(test_data.images[i])
                 pseudo_labels.append(out)
             # if out!= c_label and c_label == 5:
@@ -119,11 +119,11 @@ def test(models, test_data, batch_size):
             print('Class {}: {:1.3f}'.format(categories_train[i],correct[i]/total_samples[i]))
     test_acc = (np.sum(correct)/np.sum(total_samples))
     if save_scores:
-        np.savez('{}_{}_2da_{}.npz'.format(dataset, backbone_type, DA), scores, np.array(real_labels))
+        np.savez('{}_{}_da_{}all.npz'.format(dataset, backbone_type, DA), scores, np.array(real_labels))
     if save_pseudo_image_list:
         print("Total number of pseudo images = {} ({}%)".format(len(pseudo_img_pth), len(pseudo_img_pth)/sum(total_samples)))
         # np.savez('image_list_{}_da_{}.npz'.format(dataset, DA), np.array(pseudo_img_pth), np.array(pseudo_labels))
-        with open("{}_psuedo2_img.pickle".format(dataset), 'wb') as fh:
+        with open("{}_psuedo{}all_img.pickle".format(backbone_type,dataset), 'wb') as fh:
             # print('saving at: '+savename)
             pickle.dump([pseudo_img_pth, pseudo_labels], fh)
     return test_acc, scores

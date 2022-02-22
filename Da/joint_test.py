@@ -25,8 +25,8 @@ u = UnNormalize()
 if dataset in ['robin','pseudorobin']:
     categories_train.remove('bottle')
     categories = categories_train
-    # cat = [robin_cats[4]]
-    cat = None
+    cat = [robin_cats[0]]
+    # cat = None
     print("Testing Sub-Category(ies) {}\n".format(cat))
 else:
     cat = None
@@ -42,7 +42,7 @@ save_pseudo_image_list = False#True #!only implemented for one occlusion level
 dataset= 'pseudorobin'#'pascal3d+'
 backbone_type = 'vgg_bn' #'vgg_bn
 da_dict_dir = 'models/da_init_{}/dictionary_vgg_bn/dictionary_pool5_512.pickle'.format(backbone_type)
-da_mix_model_path = 'models/da_init_{}/0_mix_model_vmf_{}_EM_all'.format(backbone_type,dataset)
+da_mix_model_path = 'models/da_init_{}/mix_model_vmf_{}_EM_all'.format(backbone_type,dataset)
 dict_dir = 'models_snow_bn/init_{}/dictionary_{}/dictionary_pool5_512.pickle'.format(backbone_type,backbone_type)
 # dict_dir = 'models_old/init_{}/dictionary_{}/dictionary_pool5.pickle'.format(backbone_type,backbone_type)
 mix_model_path = 'models_snow_bn/init_{}/mix_model_vmf_{}_EM_all'.format(backbone_type,dataset)
@@ -52,7 +52,7 @@ dataset = 'robin'
 
 # da_dict_dir2 = 'models_robin_all_3x3/da_init_vgg_bn/dictionary_vgg_bn/dictionary_pool5_512.pickle'
 da_dict_dir2 = da_dict_dir
-da_mix_model_path2 = 'models/da_init_{}/mix_model_vmf_{}_EM_all_og'.format(backbone_type,dataset)
+da_mix_model_path2 = 'models/da_init_{}/mix_model_vmf_{}_EM_all'.format(backbone_type,dataset)
 dict_dir2 = 'models_snow_bn/init_{}/dictionary_{}/dictionary_pool5_512.pickle'.format(backbone_type,backbone_type)
 mix_model_path2 = 'models_snow_bn/init_{}/mix_model_vmf_{}_EM_all'.format(backbone_type,dataset)
 

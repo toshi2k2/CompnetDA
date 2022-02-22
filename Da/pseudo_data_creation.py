@@ -11,6 +11,7 @@ from shutil import copyfile, rmtree
 
 overwrite_folder = True
 
+dataset='robin'
 assert(dataset in ['robin','pseudorobin'])
 if dataset == 'robin':
     categories.remove('bottle')
@@ -21,7 +22,8 @@ if dataset == 'robin':
 savename = 'data/Robin/cls_pseudo_test_all' #/For all subcats combined
 # outfile = './image_list_robin_da_True.npz'
 # outfile = './robin_all_psuedo_img2.pickle'
-outfile = './robin_psuedo_img.pickle'
+# outfile = './robin_psuedo_img.pickle'
+outfile = './vgg_bn_psuedorobincontext_img.pickle'
 # filez = np.load(outfile)
 # filez.files
 # img_pth = filez['arr_0']
@@ -41,8 +43,7 @@ if overwrite_folder:
 
 if os.path.exists(savename) and not overwrite_folder:
     raise(FileExistsError)
-else:
-    os.makedirs(savename, exist_ok=True)
+os.makedirs(savename, exist_ok=True)
 
 for category in categories:
     path = os.path.join(savename, category)
