@@ -18,7 +18,7 @@ import scipy.io as sio
 from Code.config import num_mixtures
 
 DA = True
-mode = 'mixed' # '', mixed, None, corres
+mode = '' # '', mixed, None, corres
 corr = None #'snow'  #'snow'
 vc_space = 0#3
 num_layers=2

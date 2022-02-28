@@ -17,8 +17,8 @@ assert(dataset in ['robin','pseudorobin'])
 if dataset == 'robin':
     categories.remove('bottle')
     cat_test = categories
-    cat = [robin_cats[4]]
-    # cat = None
+    # cat = [robin_cats[4]]
+    cat = None
 
 savename = 'data/Robin/cls_pseudo_test_all' #/For all subcats combined
 # outfile = './image_list_robin_da_True.npz'

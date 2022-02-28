@@ -27,8 +27,8 @@ robin_cats = ['context', 'weather', 'texture', 'pose', 'shape']
 if dataset in ['robin', 'pseudorobin']:
     categories_train.remove('bottle')
     categories = categories_train
-    cat = [robin_cats[4]]
-    # cat = None
+    # cat = [robin_cats[4]]
+    cat = None
     print("Testing Sub-Category(ies) {}\n".format(cat))
 else:
     cat = None
@@ -75,7 +75,9 @@ else:
 
 # out_dir = model_save_dir + 'train_{}_a{}_b{}_vc{}_mix{}_occlikely{}_vc{}_lr_{}_{}_pretrained{}_epochs_{}_occ{}_backbone{}_{}/'.format(
 # 	layer, alpha,beta, vc_flag, mix_flag, likely, vc_num, lr, dataset, bool_load_pretrained_model,ncoord_it,bool_train_with_occluders,backbone_type,device_ids[0])
-out_dir = model_save_dir + '/vc{}{}_final/'.format(backbone_type, cat[0])
+if cat!=None:
+	out_dir = model_save_dir + '/vc{}{}_final/'.format(backbone_type, cat[0])
+else: out_dir = model_save_dir + '/vc{}_final/'.format(backbone_type)
 
 
 def train(model, train_data, val_data, epochs, batch_size, learning_rate, savedir, alpha=3,beta=3, vc_flag=True, mix_flag=False):

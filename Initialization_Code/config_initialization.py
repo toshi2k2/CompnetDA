@@ -8,7 +8,7 @@ device_ids = [0]
 data_path = 'data/'
 model_save_dir = 'models/'
 
-dataset = 'robin' # pascal3d+, coco, robin, pseudorobin
+dataset = 'pseudorobin' # pascal3d+, coco, robin, pseudorobin
 nn_type = 'vgg_tr' #vgg, vgg_bn, vgg_tr, resnet50, resnext, resnet152
 vMF_kappa=30
 vc_num = 512
