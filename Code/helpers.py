@@ -161,6 +161,9 @@ def getImg(mode,categories, dataset, data_path, cat_test=None, occ_level='ZERO',
 	#* corruption = type of corruption used - cannot be one for determinate = True
 	#* subcat = subcategory filter in robin dataset
 	assert(determinate and (corruption is not None) or not determinate and (corruption is None))
+	if dataset=='occludedrobin' and occ_level=='ZERO' and mode=='test':
+		print("\nLEVEL ZERO of occludedrobin is robin\n")
+		dataset='robin'
 
 	if mode == 'train':
 		train_imgs = []
@@ -270,7 +273,7 @@ def getImg(mode,categories, dataset, data_path, cat_test=None, occ_level='ZERO',
 					occ_imgs += [False,False]*len(img_list)
 				#! add subcategory labels to output 
 			elif dataset == 'pseudorobin':
-				#! Needs varaible for data path
+				#! Needs variable for data path
 				img_dir = './' + data_path + 'Robin/cls_pseudo_test_all/{}/'.format(category)
 				img_list = os.listdir(img_dir)
 				img_list = [img_dir + s for s in img_list]
@@ -278,6 +281,21 @@ def getImg(mode,categories, dataset, data_path, cat_test=None, occ_level='ZERO',
 				label = categories.index(category)
 				test_labels += [label]*len(img_list)
 				occ_imgs += [False,False]*len(img_list)
+			elif dataset == 'occludedrobin':
+				assert(occ_level in ['ONE', 'FIVE', 'NINE'])
+				cats = ['context', 'weather', 'texture', 'pose', 'shape']
+				if subcat is None:
+					subcat = cats
+				else: 
+					assert(all(item in cats for item in subcat))
+				for sc in subcat:
+					img_dir = './' + data_path + 'robin_occ_{}/{}/{}/'.format(occ_level,category, sc)
+					img_list = os.listdir(img_dir)
+					img_list = [img_dir + s for s in img_list]
+					test_imgs += img_list
+					label = categories.index(category)
+					test_labels += [label]*len(img_list)
+					occ_imgs += [False,False]*len(img_list)
 
 			if dataset in ['pascal3d+','coco']:
 				if os.path.exists(filelist):

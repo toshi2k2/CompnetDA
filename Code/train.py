@@ -1,8 +1,14 @@
+from cProfile import label
+import os, sys
+# from Code.test import DA
+p = os.path.abspath('.')
+sys.path.insert(1, p)
 from model import Net
 from helpers import getImg, Imgset, imgLoader, save_checkpoint,getCompositionModel,getVmfKernels, \
 	update_clutter_model
 from config import device_ids, mix_model_path, categories, categories_train, dict_dir, dataset, data_path, layer, \
-	vc_num, model_save_dir, compnet_type,backbone_type, vMF_kappa,num_mixtures
+	vc_num, model_save_dir, compnet_type,backbone_type, vMF_kappa,num_mixtures,\
+		da_dict_dir, da_mix_model_path
 from config import config as cfg
 from torch.utils.data import DataLoader
 from losses import ClusterLoss
@@ -10,11 +16,22 @@ from model import resnet_feature_extractor
 import torchvision.models as models
 
 import time
-import os
 import torch
 import torch.nn as nn
 import numpy as np
 import random
+import robusta
+
+robin_cats = ['context', 'weather', 'texture', 'pose', 'shape']
+
+if dataset in ['robin', 'pseudorobin']:
+    categories_train.remove('bottle')
+    categories = categories_train
+    cat = [robin_cats[4]]
+    # cat = None
+    print("Testing Sub-Category(ies) {}\n".format(cat))
+else:
+    cat = None
 
 #---------------------
 # Training Parameters
@@ -23,24 +40,42 @@ alpha = 3  # vc-loss
 beta = 3 # mix loss
 likely = 0.6 # occlusion likelihood
 lr = 1e-2 # learning rate
-batch_size = 1 # these are pseudo batches as the aspect ratio of images for CompNets is not square
+
+batch_size = 64#1 # these are pseudo batches as the aspect ratio of images for CompNets is not square
+pseudo_batch_size=64
+DA=True
+mode='' # ''-train with test set
+test_as_val=True # use test data for validation
+use_gce = True
+
 # Training setup
 vc_flag = True # train the vMF kernels
 mix_flag = True # train mixture components
-ncoord_it = 50 	#number of epochs to train
+ncoord_it = 60 	#number of epochs to train
 
 bool_mixture_model_bg = False #True: use a mixture of background models per pixel, False: use one bg model for whole image
 bool_load_pretrained_model = False
 bool_train_with_occluders = False
+bool_square_images = True#False
 
+dataset= 'pseudorobin'#'pascal3d+'
+backbone_type = 'vgg_tr' #'vgg_bn
+da_dict_dir = 'models/da_init_{}/dictionary_{}/dictionary_{}_{}.pickle'.format(backbone_type, backbone_type, layer, vc_num)
+da_mix_model_path = 'models/da_init_{}/mix_model_vmf_{}_EM_all'.format(backbone_type,dataset)
+dict_dir = 'models/init_{}/dictionary_{}/dictionary_{}_{}.pickle'.format(backbone_type,backbone_type, layer, vc_num)
+# dict_dir = 'models_old/init_{}/dictionary_{}/dictionary_pool5.pickle'.format(backbone_type,backbone_type)
+mix_model_path = 'models/init_{}/mix_model_vmf_{}_EM_all'.format(backbone_type,dataset)
+# da_dict_dir = 'models/da_init_vgg/dictionary_vgg/corres_dict_pool5_512.pickle'
+dataset='robin'
 
 if bool_train_with_occluders:
 	occ_levels_train = ['ZERO', 'ONE', 'FIVE', 'NINE']
 else:
 	occ_levels_train = ['ZERO']
 
-out_dir = model_save_dir + 'train_{}_a{}_b{}_vc{}_mix{}_occlikely{}_vc{}_lr_{}_{}_pretrained{}_epochs_{}_occ{}_backbone{}_{}/'.format(
-	layer, alpha,beta, vc_flag, mix_flag, likely, vc_num, lr, dataset, bool_load_pretrained_model,ncoord_it,bool_train_with_occluders,backbone_type,device_ids[0])
+# out_dir = model_save_dir + 'train_{}_a{}_b{}_vc{}_mix{}_occlikely{}_vc{}_lr_{}_{}_pretrained{}_epochs_{}_occ{}_backbone{}_{}/'.format(
+# 	layer, alpha,beta, vc_flag, mix_flag, likely, vc_num, lr, dataset, bool_load_pretrained_model,ncoord_it,bool_train_with_occluders,backbone_type,device_ids[0])
+out_dir = model_save_dir + '/vc{}{}_final/'.format(backbone_type, cat[0])
 
 
 def train(model, train_data, val_data, epochs, batch_size, learning_rate, savedir, alpha=3,beta=3, vc_flag=True, mix_flag=False):
@@ -51,7 +86,7 @@ def train(model, train_data, val_data, epochs, batch_size, learning_rate, savedi
 	}
 	out_file_name = savedir + 'result.txt'
 	total_train = len(train_data)
-	train_loader = DataLoader(dataset=train_data, batch_size=1, shuffle=True)
+	train_loader = DataLoader(dataset=train_data, batch_size=batch_size, shuffle=True)
 	val_loaders=[]
 
 	for i in range(len(val_data)):
@@ -73,6 +108,9 @@ def train(model, train_data, val_data, epochs, batch_size, learning_rate, savedi
 	else:
 		model.mix_model.requires_grad = True
 
+	if use_gce:
+		print("\nUsing GCE Loss\n")
+	rpl_loss = robusta.selflearning.GeneralizedCrossEntropy(q=0.8)
 	classification_loss = nn.CrossEntropyLoss()
 	cluster_loss = ClusterLoss()
 
@@ -103,7 +141,10 @@ def train(model, train_data, val_data, epochs, batch_size, learning_rate, savedi
 
 			out = output.argmax(1)
 			correct += torch.sum(out == label)
-			class_loss = classification_loss(output, label) / output.shape[0]
+			if not use_gce:
+				class_loss = classification_loss(output, label) / output.shape[0]
+			else:
+				class_loss = rpl_loss(output) / output.shape[0]
 
 			loss = class_loss
 			if alpha != 0:
@@ -118,7 +159,11 @@ def train(model, train_data, val_data, epochs, batch_size, learning_rate, savedi
 			loss.backward()
 
 			# pseudo batches
-			if np.mod(index,batch_size)==0:# and index!=0:
+			if batch_size==1:
+				if np.mod(index,pseudo_batch_size)==0 and index!=0:
+					optimizer.step()
+					optimizer.zero_grad()
+			else:
 				optimizer.step()
 				optimizer.zero_grad()
 
@@ -187,11 +232,33 @@ if __name__ == '__main__':
 			extractor = models.vgg16(pretrained=True).features[0:24]
 		else:
 			extractor = models.vgg16(pretrained=True).features
+	elif backbone_type =='vgg_tr':
+		"""VGG model trained from scratch or pretrained"""
+		print("Loading robin trained model")
+		layer = 'pool5'  # 'pool5','pool4'
+		# saved_model = 'baseline_models/train_None_lr_0.01_pascal3d+_pretrained_False_epochs_15_occ_False_backbonevgg_0/vgg14.pth'
+		saved_model = 'baseline_models/Robin-train-vgg_bn.pth' # adapted vgg_bn
+		# saved_model = 'baseline_models/None_adapted_vgg_bn_robin.pth' # adapted vgg_bn for robin
+		# saved_model = 'baseline_models/robinNone_lr_0.001_scratFalsepretrFalse_ep60_occFalse_backbvgg_bn_0/vgg_bn51.pth'
+		load_dict = torch.load(saved_model, map_location='cuda:{}'.format(0))
+		# tmp = models.vgg16(pretrained=False)
+		tmp = models.vgg16_bn(pretrained=False)
+		num_ftrs = tmp.classifier[6].in_features
+		if dataset in ['robin', 'pseudorobin', 'occludedrobin']:
+			tmp.classifier[6] = torch.nn.Linear(num_ftrs, 11)
+		else:
+			tmp.classifier[6] = torch.nn.Linear(num_ftrs, len(categories))
+		tmp.load_state_dict(load_dict['state_dict'])
+		tmp.eval()
+		extractor = tmp.features
 	elif backbone_type=='resnet50' or backbone_type=='resnext':
 		extractor = resnet_feature_extractor(backbone_type, layer)
 
 	extractor.cuda(device_ids[0]).eval()
-	weights = getVmfKernels(dict_dir, device_ids)
+	if DA:
+		weights = getVmfKernels(da_dict_dir, device_ids)
+	else:
+		weights = getVmfKernels(dict_dir, device_ids)
 
 	if bool_load_pretrained_model:
 		pretrained_file = 'PATH TO .PTH FILE HERE'
@@ -204,8 +271,11 @@ if __name__ == '__main__':
 		# setting the same occlusion likelihood for all classes
 		occ_likely.append(likely)
 
-	# load the CompNet initialized with ML and spectral clustering
-	mix_models = getCompositionModel(device_ids,mix_model_path,layer,categories_train,compnet_type=compnet_type)
+	if DA:
+		mix_models = getCompositionModel(device_ids,da_mix_model_path,layer,categories_train,compnet_type=compnet_type)
+	else:
+		# load the CompNet initialized with ML and spectral clustering
+		mix_models = getCompositionModel(device_ids,mix_model_path,layer,categories_train,compnet_type=compnet_type)
 	net = Net(extractor, weights, vMF_kappa, occ_likely, mix_models, bool_mixture_bg=bool_mixture_model_bg,compnet_type=compnet_type,num_mixtures=num_mixtures, vc_thresholds=cfg.MODEL.VC_THRESHOLD)
 	if bool_load_pretrained_model:
 		net.load_state_dict(torch.load(pretrained_file, map_location='cuda:{}'.format(device_ids[0]))['state_dict'])
@@ -229,25 +299,42 @@ if __name__ == '__main__':
 			train_fac=0.1
 
 		for occ_type in occ_types:
-			imgs, labels, masks = getImg('train', categories_train, dataset, data_path, categories, occ_level, occ_type, bool_load_occ_mask=False)
+			if DA and mode not in ['mixed', 'corres']:
+				if dataset in ['robin','pseudorobin']:
+					print("Loading Robin test data (pseudo {})".format(dataset=='pseudorobin'))
+					imgs, labels, masks = getImg('test', categories_train, dataset, data_path, categories, \
+						occ_level, occ_type, bool_load_occ_mask=False, subcat=cat)
+			else:
+				imgs, labels, masks = getImg('train', categories_train, dataset, data_path, \
+					categories, occ_level, occ_type, bool_load_occ_mask=False, subcat=cat)
 			nimgs=len(imgs)
-			for i in range(nimgs):
-				if (random.randint(0, nimgs - 1) / nimgs) <= train_fac:
-					train_imgs.append(imgs[i])
-					train_labels.append(labels[i])
-					train_masks.append(masks[i])
-				elif not bool_train_with_occluders:
-					val_imgs.append(imgs[i])
-					val_labels.append(labels[i])
-					val_masks.append(masks[i])
+			if not test_as_val:
+				for i in range(nimgs):
+					if (random.randint(0, nimgs - 1) / nimgs) <= train_fac:
+						train_imgs.append(imgs[i])
+						train_labels.append(labels[i])
+						train_masks.append(masks[i])
+					elif not bool_train_with_occluders:
+						val_imgs.append(imgs[i])
+						val_labels.append(labels[i])
+						val_masks.append(masks[i])
+			else:
+				train_imgs, train_labels, train_masks = imgs, labels, masks
+				# assert(dataset=='robin')
+				od = dataset
+				dataset='robin'
+				print("Loading Test as Val of Robin")
+				val_imgs, val_labels, val_masks = getImg('test', categories_train, dataset, data_path, \
+					categories, occ_level, occ_type, bool_load_occ_mask=False, subcat=cat)
+				dataset=od
 
 	print('Total imgs for train ' + str(len(train_imgs)))
 	print('Total imgs for val ' + str(len(val_imgs)))
-	train_imgset = Imgset(train_imgs,train_masks, train_labels, imgLoader,bool_square_images=False)
+	train_imgset = Imgset(train_imgs,train_masks, train_labels, imgLoader,bool_square_images=bool_square_images)
 
 	val_imgsets = []
 	if val_imgs:
-		val_imgset = Imgset(val_imgs,val_masks, val_labels, imgLoader,bool_square_images=False)
+		val_imgset = Imgset(val_imgs,val_masks, val_labels, imgLoader,bool_square_images=bool_square_images)
 		val_imgsets.append(val_imgset)
 
 	# write parameter settings into output folder

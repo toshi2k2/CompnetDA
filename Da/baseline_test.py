@@ -25,19 +25,26 @@ backbone_type='vgg_bn'
 # saved_model = 'baseline_models/train_None_lr_0.0001_robin_scratchFalsepretrained_False_epochs_100_occ_False_backboneresnet50_0/resnet5047.pth'
 # saved_model = 'baseline_models/train_None_lr_0.01_pascal3d+_scratchTruepretrained_True_epochs_50_occ_False_backbonevgg_0/vgg1.pth'
 # saved_model = 'baseline_models/train_None_lr_0.01_robin_scratchFalsepretrained_False_epochs_50_occ_False_backbonevgg_bn_0/vgg_bn3.pth'
-# saved_model = 'models_old/best.pth'
-saved_model = 'baseline_models/robinNone_lr_0.001_scratFalsepretrFalse_ep60_occFalse_backbvgg_bn_0/vgg_bn51.pth'
+saved_model = '/mnt/sda1/cl_reps/Robin/vggbnshape_bn/best.pth'
+# saved_model = 'baseline_models/ROBIN-train-resnet50.pth'
+# saved_model = 'baseline_models/robinNone_lr_0.001_scratFalsepretrFalse_ep60_occFalse_backbvgg_bn_0/vgg_bn51.pth'
 corr = None#'snow'
 # backbone_type = 'resnet50'
+bool_square_images=True
+dataset = 'occludedrobin'
 
 likely = 0.6  # occlusion likelihood
-occ_levels = ['ZERO', 'ONE', 'FIVE', 'NINE'] # occlusion levels to be evaluated [0%,20-40%,40-60%,60-80%]
+occ_levels = ['ZERO','ONE', 'FIVE', 'NINE'] # occlusion levels to be evaluated [0%,20-40%,40-60%,60-80%]
 
-if dataset in ['robin', 'psuedorobin']:
-	occ_levels = ['ZERO']
+if dataset in ['robin', 'psuedorobin', 'occludedrobin']:
+	# occ_levels = ['ZERO']
 	categories_train.remove('bottle')
 	categories = categories_train
 	# robin_cats = [''] # option will run on entire robin testset
+	robin_cats = ['shape']
+
+if dataset in ['robin', 'psuedorobin']:
+	occ_levels = ['ZERO']
 
 def test(models, test_data, batch_size):
 	test_loader = DataLoader(dataset=test_data, batch_size=batch_size, shuffle=True)
@@ -130,15 +137,15 @@ if __name__ == '__main__':
 		else:
 			if dataset=='pascal3d+':
 				occ_types = ['']#['_white','_noise', '_texture', '']
-			elif dataset=='coco':
+			elif dataset in ['coco','occludedrobin']:
 				occ_types = ['']
 
 		for index, occ_type in enumerate(occ_types):
 			for cat in robin_cats:
-				if cat == '' and dataset=='robin': 
+				if cat == '' and dataset in ['robin','occludedrobin']: 
 					cat = None
 					print("All Subcategories\n")
-				elif dataset == 'robin':
+				elif dataset in ['robin','occludedrobin']:
 					print(cat)
 					cat=[cat]
 				# load images
@@ -165,7 +172,7 @@ if __name__ == '__main__':
 				print('Total imgs for test of occ_level {} and occ_type {} '.format(occ_level, occ_type) + str(len(test_imgs)))
 				"""test_imgs is list of image path and name strings"""
 				# get image loader
-				test_imgset = Imgset(test_imgs, masks, test_labels, imgLoader, bool_square_images=False)
+				test_imgset = Imgset(test_imgs, masks, test_labels, imgLoader, bool_square_images=bool_square_images)
 				# compute test accuracy
 				acc, scores = test(models=model, test_data=test_imgset, batch_size=1)
 				out_str = 'Model Name: Occ_level:{}, Occ_type:{}, Acc:{}'.format(occ_level, occ_type, acc)

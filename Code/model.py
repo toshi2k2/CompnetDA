@@ -354,14 +354,14 @@ def resnet_feature_extractor(type, layer='last'):
     if type == 'resnet50':
         net = models.resnet50(pretrained=True)
 
-        # print("Loading robin trained model")
-        # net.fc = torch.nn.Linear(net.fc.in_features, 12)
-        # path = 'baseline_models/ROBIN-train-resnet50.pth'
-        # if device_ids:
-        #     load_dict = torch.load(path, map_location='cuda:{}'.format(0))
-        # else:
-        #     load_dict = torch.load(path, map_location='cpu')
-        # net.load_state_dict(load_dict['state_dict'])
+        print("Loading robin trained model")
+        net.fc = torch.nn.Linear(net.fc.in_features, 12)
+        path = 'baseline_models/ROBIN-train-resnet50.pth'
+        if device_ids:
+            load_dict = torch.load(path, map_location='cuda:{}'.format(0))
+        else:
+            load_dict = torch.load(path, map_location='cpu')
+        net.load_state_dict(load_dict['state_dict'])
 
         if layer == 'last':
             extractor.add_module('0', net.conv1)

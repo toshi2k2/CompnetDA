@@ -25,6 +25,7 @@ vc_space = 0#3
 ignore_edge = False#True # ignore edge of layer output - to reduce comptuations
 add_data = False # add data to current data
 
+bool_square_images = True#False
 paral_num = 10
 nimg_per_cat = 5000
 imgs_par_cat = np.zeros(len(categories))
@@ -36,7 +37,7 @@ print('{} max_images {}'.format(dataset, nimg_per_cat))
 if dataset in ['robin','pseudorobin']:
     categories.remove('bottle')
     cat_test = categories
-    # cat = [robin_cats[0]]
+    # cat = [robin_cats[4]]
     cat = None
 
 if DA or mode in ['mixed', '', 'reverse']:
@@ -95,7 +96,7 @@ for category in categories:  # * loading individual class categories
     ## HERE
     # imgset = Imgset(imgs, masks, labels, imgLoader, bool_square_images=False,bool_cutout=False,\
     # 	bool_pytorch=bool_pytorch)  # ! extra parameters!
-    imgset = Imgset(imgs, masks, labels, imgLoader, bool_square_images=False)
+    imgset = Imgset(imgs, masks, labels, imgLoader, bool_square_images=bool_square_images)
     data_loader = DataLoader(dataset=imgset, batch_size=1, shuffle=False)
     if DA or mode in ['mixed', '', 'corres']:
         savename = os.path.join(da_sim_dir, 'simmat_mthrh045_{}_K{}.pickle'.format(category,vc_num))

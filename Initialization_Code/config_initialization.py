@@ -9,7 +9,7 @@ data_path = 'data/'
 model_save_dir = 'models/'
 
 dataset = 'robin' # pascal3d+, coco, robin, pseudorobin
-nn_type = 'resnet50' #vgg, vgg_bn, vgg_tr, resnet50, resnext, resnet152
+nn_type = 'vgg_tr' #vgg, vgg_bn, vgg_tr, resnet50, resnext, resnet152
 vMF_kappa=30
 vc_num = 512
 vc_shape = 0#0
@@ -34,18 +34,20 @@ elif nn_type =='vgg_bn':
 	elif layer =='pool5':
 		extractor = models.vgg16_bn(pretrained=True).features
 elif nn_type =='vgg_tr':
-	"""VGG model trained from scratch"""
+	"""VGG model trained from scratch or pretrained"""
+	print("Loading robin trained model")
 	layer = 'pool5'  # 'pool5','pool4'
 	# saved_model = 'baseline_models/train_None_lr_0.01_pascal3d+_pretrained_False_epochs_15_occ_False_backbonevgg_0/vgg14.pth'
-	# saved_model = 'baseline_models/snowadaptedvggbn.pth' # adapted vgg_bn
+	saved_model = 'baseline_models/Robin-train-vgg_bn.pth' # adapted vgg_bn
 	# saved_model = 'baseline_models/None_adapted_vgg_bn_robin.pth' # adapted vgg_bn for robin
-	saved_model = 'baseline_models/robinNone_lr_0.001_scratFalsepretrFalse_ep60_occFalse_backbvgg_bn_0/vgg_bn51.pth'
+	# saved_model = 'baseline_models/robinNone_lr_0.001_scratFalsepretrFalse_ep60_occFalse_backbvgg_bn_0/vgg_bn51.pth'
 	load_dict = torch.load(saved_model, map_location='cuda:{}'.format(0))
 	# tmp = models.vgg16(pretrained=False)
 	tmp = models.vgg16_bn(pretrained=False)
 	num_ftrs = tmp.classifier[6].in_features
-	if dataset == 'robin':
-		tmp.classifier[6] = torch.nn.Linear(num_ftrs, len(categories)-1)
+	if dataset in ['robin', 'pseudorobin']:
+		# tmp.classifier[6] = torch.nn.Linear(num_ftrs, len(categories)-1)
+		tmp.classifier[6] = torch.nn.Linear(num_ftrs, 11)
 	else:
 		tmp.classifier[6] = torch.nn.Linear(num_ftrs, len(categories))
 	tmp.load_state_dict(load_dict['state_dict'])

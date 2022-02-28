@@ -22,13 +22,14 @@ u = UnNormalize()
 DA = True
 corr = None#'snow'  # 'snow'
 backgnd_corr = None # backgnd corruption - if None corr will be applied to entire image
-# cat  = [robin_cats[0]] #/ for individual sub-cats
+# cat  = [robin_cats[4]] #/ for individual sub-cats
 cat = None
 # offset = 2 #/ should
 vc_space = 0#3
-retrain_vc = False#True
+retrain_vc = True
 add_data = False
 frc = 0.9
+bool_square_images=True#False
 
 img_per_cat = 1000  # image per category
 if add_data:
@@ -56,7 +57,8 @@ if DA:
     else:
         print("Loading {} train data".format(dataset))
         imgs, labels, masks = getImg('train', categories, dataset, data_path, cat_test, \
-            occ_level, occ_type, bool_load_occ_mask=False, determinate=True, corruption=corr, corr_bck=backgnd_corr)
+            occ_level, occ_type, bool_load_occ_mask=False, determinate=True, corruption=corr, \
+                corr_bck=backgnd_corr)
 else:
     print("Loading {} train data".format(dataset))
     imgs, labels, masks = getImg('train', categories, dataset, data_path, cat_test, \
@@ -67,16 +69,16 @@ if add_data:
     print("Adding clean data from robin train!")
     imgs2, labels2, masks2 = getImg('train', categories, 'robin', data_path, cat_test, \
         occ_level, occ_type, bool_load_occ_mask=False)
-    temp_list = list(zip(imgs2, labels2, masks2))
-    sampled = random.sample(temp_list, int(min(len(imgs), len(imgs2))*frc))
-    imgs+=[i for (i,l,m) in sampled]
-    labels+=[l for (i,l,m) in sampled]
-    masks+=[m for (i,l,m) in sampled] 
-    # imgs+=imgs2
-    # labels+=labels2
-    # masks+=masks2
+    # temp_list = list(zip(imgs2, labels2, masks2))
+    # sampled = random.sample(temp_list, int(min(len(imgs), len(imgs2))*frc))
+    # imgs+=[i for (i,l,m) in sampled]
+    # labels+=[l for (i,l,m) in sampled]
+    # masks+=[m for (i,l,m) in sampled] 
+    imgs+=imgs2
+    labels+=labels2
+    masks+=masks2
 #/#########################################
-imgset = Imgset(imgs, masks, labels, imgLoader, bool_square_images=False)
+imgset = Imgset(imgs, masks, labels, imgLoader, bool_square_images=bool_square_images)
 data_loader = DataLoader(dataset=imgset, batch_size=1, shuffle=False)
 nimgs = len(imgs)
 
@@ -208,12 +210,13 @@ if not retrain_vc:
     model.fit(feat_set, vMF_kappa, max_it=150)
 else:
     print("RETRAINING VCs\n")
-    with open('models_robin_all/init_vgg_bn/dictionary_vgg_bn/dictionary_pool5_512.pickle', 'rb') as fh:
+    with open('models/FINAL/init_vgg_tr/dictionary_vgg_tr/dictionary_pool5_512.pickle', 'rb') as fh:
         prev_mu = pickle.load(fh)
-    with open('models_robin_all/init_vgg_bn/dictionary_vgg_bn/dictionary_pool5_512_p.pickle', 'rb') as fh:
+    with open('models/FINAL/init_vgg_tr/dictionary_vgg_tr/dictionary_pool5_512_p.pickle', 'rb') as fh:
         prev_p = pickle.load(fh)
     prev_pi = np.sum(prev_p, axis=0)/prev_p.shape[0]
-    model.fit_soft(features=feat_set, p=prev_p, mu=prev_mu, pi=prev_pi, kappa=vMF_kappa, max_it=150)
+    # model.fit_soft(features=feat_set, p=prev_p, mu=prev_mu, pi=prev_pi, kappa=vMF_kappa, max_it=150)
+    model.fit_map(feat_set, pre_mu=prev_mu, pre_pi=prev_pi, kappa=vMF_kappa, max_it=300)
     del(prev_p, prev_mu, prev_pi)
 
 if DA:

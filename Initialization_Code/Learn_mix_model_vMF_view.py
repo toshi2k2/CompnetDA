@@ -24,11 +24,12 @@ vc_space = 0#3
 num_layers=2
 cluster_perlayer = num_mixtures//num_layers
 add_data = False # add data to current data
+bool_square_images = True#False
 
 if dataset in ['robin','pseudorobin']:
     categories.remove('bottle')
     cat_test = categories
-    # cat = [robin_cats[0]]
+    # cat = [robin_cats[4]]
     cat = None
 
 if DA and mode in ['corres']:
@@ -106,7 +107,7 @@ def learn_mix_model_vMF(category,num_layers = 2,num_clusters_per_layer = 2,frac_
     img_idx = np.asarray([nn for nn in range(N)])
     imgs = imgs[:N]
 
-    imgset = Imgset(imgs, masks, labels, imgLoader, bool_square_images=False)
+    imgset = Imgset(imgs, masks, labels, imgLoader, bool_square_images=bool_square_images)
     data_loader = DataLoader(dataset=imgset, batch_size=1, shuffle=False)
 
     r_set = []#[None for nn in range(N)]

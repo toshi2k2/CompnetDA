@@ -113,9 +113,9 @@ _C.MODEL.MIXTURE_NUM = 4 # number of mixture models per class
 # 'second' if _C.MODEL.BACKBONE_TYPE is 'resnet50', 'resnext'. None
 # means default layer, i.e. 'pool5' for 'vgg' and 'last' for 'resnet50',
 # 'resnext', 'densenet'.
-_C.MODEL.LAYER = 'last'#'pool5','last'
+_C.MODEL.LAYER = 'pool5'#'pool5','last'
 # options: 'vgg', 'resnet50', 'resnext'
-_C.MODEL.BACKBONE_TYPE = 'resnet50' #'vgg', 'resnet50
+_C.MODEL.BACKBONE_TYPE = 'vgg' #'vgg', 'resnet50
 
 ###############################################################################
 # Training configs

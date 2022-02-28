@@ -7,7 +7,8 @@ import numpy as np
 from torch.utils.data import DataLoader
 from config import categories, categories_train, dataset, data_path, \
     device_ids, mix_model_path, dict_dir, layer, vMF_kappa, model_save_dir, \
-        compnet_type, backbone_type, num_mixtures, da_mix_model_path, da_dict_dir
+        compnet_type, backbone_type, num_mixtures, da_mix_model_path, \
+            da_dict_dir, vc_num, da_init_path, init_path
 from config import config as cfg
 from model import Net
 from helpers import getImg, Imgset, imgLoader, getVmfKernels, getCompositionModel, update_clutter_model, \
@@ -21,11 +22,11 @@ import pickle
 import torchvision
 u = UnNormalize()
 
-if dataset in ['robin', 'pseudorobin']:
+if dataset in ['robin', 'pseudorobin', 'occludedrobin']:
     categories_train.remove('bottle')
     categories = categories_train
-    cat = [robin_cats[0]]
-    # cat = None
+    # cat = [robin_cats[4]]
+    cat = None
     print("Testing Sub-Category(ies) {}\n".format(cat))
 else:
     cat = None
@@ -34,19 +35,22 @@ DA = True
 test_orig = True#False  #* test compnets with clean images
 corr = None#'snow'  # 'snow'
 vc_space = 0#2,3 # default=0
-save_scores = True
-save_pseudo_image_list = True #!only implemented for one occlusion level
+save_scores,save_pseudo_image_list = True, True #!only implemented for one occlusion level
+bool_load_pretrained_model = False # False if you want to load initialization (see Initialization_Code/)
 
+bool_square_images = True#False
 # dataset= 'robin'#'pascal3d+'
-# backbone_type = 'vgg_bn' #'vgg_bn
-da_dict_dir = 'models/da_init_{}/dictionary_{}/dictionary_{}_512.pickle'.format(backbone_type, backbone_type, layer)
+backbone_type = 'resnet50' #'vgg_bn
+da_dict_dir = 'models/da_init_{}/dictionary_{}/dictionary_{}_{}.pickle'.format(backbone_type, backbone_type, layer, vc_num)
 da_mix_model_path = 'models/da_init_{}/mix_model_vmf_{}_EM_all'.format(backbone_type,dataset)
-dict_dir = 'models/init_{}/dictionary_{}/dictionary_{}_512.pickle'.format(backbone_type,backbone_type, layer)
+dict_dir = 'models/init_{}/dictionary_{}/dictionary_{}_{}.pickle'.format(backbone_type,backbone_type, layer, vc_num)
 # dict_dir = 'models_old/init_{}/dictionary_{}/dictionary_pool5.pickle'.format(backbone_type,backbone_type)
 mix_model_path = 'models/init_{}/mix_model_vmf_{}_EM_all'.format(backbone_type,dataset)
 # da_dict_dir = 'models/da_init_vgg/dictionary_vgg/corres_dict_pool5_512.pickle'
+if backbone_type == 'vgg_tr':
+    da_init_path+='_tr'
 
-dataset = 'robin' #'robin'
+dataset = 'occludedrobin' #'robin'
 print("{} Corruption Model is {} and clean test data is {}".format(corr, DA, test_orig))
 
 ###################
@@ -54,14 +58,15 @@ print("{} Corruption Model is {} and clean test data is {}".format(corr, DA, tes
 ###################
 likely = 0.6  # occlusion likelihood
 occ_levels = ['ZERO', 'ONE', 'FIVE', 'NINE'] # occlusion levels to be evaluated [0%,20-40%,40-60%,60-80%]
-if dataset == 'robin':
+# occ_levels = ['ONE', 'FIVE', 'NINE'] # occlusion levels to be evaluated [0%,20-40%,40-60%,60-80%]
+if dataset in ['robin','pseudorobin']:
     occ_levels = ['ZERO']
-bool_load_pretrained_model = False # False if you want to load initialization (see Initialization_Code/)
-bool_mixture_model_bg = False 	# use maximal mixture model or sum of all mixture models, not so important
+
+bool_mixture_model_bg = False#True 	# use maximal mixture model or sum of all mixture models, not so important
 bool_multi_stage_model = False 	# this is an old setup
 
 
-def test(models, test_data, batch_size):
+def test(models, test_data, occ_level, batch_size):
     test_loader = DataLoader(dataset=test_data, batch_size=batch_size, shuffle=False)
     print('Testing')
     nclasses = models[0].num_classes
@@ -104,7 +109,7 @@ def test(models, test_data, batch_size):
             out = out.argmax(1)
             correct[c_label] += np.sum(out == c_label)
 
-            if np.max(temp)>=0.4:
+            if np.max(temp)>=0.5:
                 pseudo_img_pth.append(test_data.images[i])
                 pseudo_labels.append(out)
             # if out!= c_label and c_label == 5:
@@ -118,14 +123,15 @@ def test(models, test_data, batch_size):
         if total_samples[i]>0:
             print('Class {}: {:1.3f}'.format(categories_train[i],correct[i]/total_samples[i]))
     test_acc = (np.sum(correct)/np.sum(total_samples))
-    if save_scores:
-        np.savez('{}_{}_da_{}all.npz'.format(dataset, backbone_type, DA), scores, np.array(real_labels))
-    if save_pseudo_image_list:
-        print("Total number of pseudo images = {} ({}%)".format(len(pseudo_img_pth), len(pseudo_img_pth)/sum(total_samples)))
-        # np.savez('image_list_{}_da_{}.npz'.format(dataset, DA), np.array(pseudo_img_pth), np.array(pseudo_labels))
-        with open("{}_psuedo{}all_img.pickle".format(backbone_type,dataset), 'wb') as fh:
-            # print('saving at: '+savename)
-            pickle.dump([pseudo_img_pth, pseudo_labels], fh)
+    if occ_level == 'ZERO':
+        if save_scores:
+            np.savez(da_init_path+'/{}_{}_da_{}.npz'.format(dataset, backbone_type, DA), scores, np.array(real_labels))
+        if save_pseudo_image_list:
+            print("Total number of pseudo images = {} ({}%)".format(len(pseudo_img_pth), len(pseudo_img_pth)/sum(total_samples)))
+            # np.savez('image_list_{}_da_{}.npz'.format(dataset, DA), np.array(pseudo_img_pth), np.array(pseudo_labels))
+            with open(da_init_path+"/{}_psuedo{}_img.pickle".format(backbone_type,dataset), 'wb') as fh:
+                # print('saving at: '+savename)
+                pickle.dump([pseudo_img_pth, pseudo_labels], fh)
     return test_acc, scores
 
 if __name__ == '__main__':
@@ -134,6 +140,7 @@ if __name__ == '__main__':
         bool_mixture_model_bg = True
 
     if bool_load_pretrained_model:
+        vc_dir = model_save_dir
         print(">>>>>>>>>>>>> LOADING Pre-Trained Model")
         if backbone_type=='vgg' or 'vgg_tr':
             if layer=='pool5':
@@ -143,9 +150,9 @@ if __name__ == '__main__':
                     vc_dir = model_save_dir+'vgg_pool5_coco/'
 
         vc_file = vc_dir + 'best.pth'
-        outdir = vc_dir
-        # vc_file = model_save_dir + 'train_pool5_a3_b3_vcTrue_mixTrue_occlikely0.6_vc512_lr_0.01_pascal3d+_pretrainedFalse_epochs_50_occFalse_backbonevgg_0/vc9.pth'
-        vc_file = model_save_dir + 'train_pool5_a0_b0_vcTrue_mixTrue_occlikely0.6_vc512_lr_0.0001_pascal3d+_pretrainedFalse_epochs_50_occFalse_backbonevgg_tr_0/vc2.pth'
+        # outdir = vc_dir
+        vc_file = model_save_dir + 'vc{}{}_final/vc50.pth'.format(backbone_type, cat[0])
+        # vc_file = model_save_dir + 'train_pool5_a0_b0_vcTrue_mixTrue_occlikely0.6_vc512_lr_0.0001_pascal3d+_pretrainedFalse_epochs_50_occFalse_backbonevgg_tr_0/vc2.pth'
     else:
         if DA:
             vc_dir = model_save_dir+'da_compnet_{}_{}_{}_initialization/'.format(layer,\
@@ -155,7 +162,7 @@ if __name__ == '__main__':
                 compnet_type,likely,dataset)
         print("VD Dir: ", vc_dir)
         vc_path = ''
-        outdir = vc_dir
+        # outdir = vc_dir
 
     # if not os.path.exists(outdir):
     #     print("creating :", outdir)
@@ -180,14 +187,15 @@ if __name__ == '__main__':
         else:
             extractor = models.vgg16_bn(pretrained=True).features
     elif backbone_type =='vgg_tr':
-        saved_model = 'baseline_models/train_None_lr_0.01_pascal3d+_pretrained_False_epochs_15_occ_False_backbonevgg_0/vgg14.pth'
+        # saved_model = 'baseline_models/train_None_lr_0.01_pascal3d+_pretrained_False_epochs_15_occ_False_backbonevgg_0/vgg14.pth'
         # saved_model = 'baseline_models/snowadaptedvggbn.pth' # adapted vgg_bn
-        saved_model = 'baseline_models/None_adapted_vgg_bn_robin.pth' # adapted vgg_bn for robin
+        saved_model = 'baseline_models/Robin-train-vgg_bn.pth' # adapted vgg_bn for robin
         load_dict = torch.load(saved_model, map_location='cuda:{}'.format(0))
         # tmp = models.vgg16(pretrained=False)
         tmp = models.vgg16_bn(pretrained=False)
         num_ftrs = tmp.classifier[6].in_features
-        tmp.classifier[6] = torch.nn.Linear(num_ftrs, len(categories_train))
+        # tmp.classifier[6] = torch.nn.Linear(num_ftrs, len(categories_train))
+        tmp.classifier[6] = torch.nn.Linear(num_ftrs, 11)
         tmp.load_state_dict(load_dict['state_dict'])
         tmp.eval()
         if layer=='pool4':
@@ -245,7 +253,7 @@ if __name__ == '__main__':
                 occ_types = ['']#['_white','_noise', '_texture', '']
             elif dataset=='coco':
                 occ_types = ['']
-            elif dataset=='robin':
+            elif dataset in ['robin','occludedrobin']:
                 occ_types = ['']
 
         for index, occ_type in enumerate(occ_types):
@@ -273,8 +281,8 @@ if __name__ == '__main__':
                     del masks[idx_rm]
             """test_imgs is list of image path and name strings"""
             # get image loader
-            test_imgset = Imgset(test_imgs, masks, test_labels, imgLoader, bool_square_images=False)
+            test_imgset = Imgset(test_imgs, masks, test_labels, imgLoader, bool_square_images=bool_square_images)
             # compute test accuracy
-            acc,scores = test(models=nets, test_data=test_imgset, batch_size=1)
+            acc,scores = test(models=nets, test_data=test_imgset, occ_level=occ_level, batch_size=1)
             out_str = 'Model Name: Occ_level:{}, Occ_type:{}, Acc:{}'.format(occ_level, occ_type, acc)
             print(out_str)

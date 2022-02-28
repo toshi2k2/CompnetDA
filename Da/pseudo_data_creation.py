@@ -5,7 +5,8 @@ p = os.path.abspath('.')
 sys.path.insert(1, p)
 from Initialization_Code.config_initialization import vc_num, dataset, categories, data_path, \
     cat_test, device_ids, Astride, Apad, Arf, vMF_kappa, layer, init_path, \
-    dict_dir, sim_dir, extractor, da_sim_dir, da_dict_dir, robin_cats
+    dict_dir, sim_dir, extractor, da_sim_dir, da_dict_dir, robin_cats, \
+        model_save_dir, da_init_path
 import pickle
 from shutil import copyfile, rmtree
 
@@ -16,14 +17,14 @@ assert(dataset in ['robin','pseudorobin'])
 if dataset == 'robin':
     categories.remove('bottle')
     cat_test = categories
-    # cat = [robin_cats[0]]
-    cat = None
+    cat = [robin_cats[4]]
+    # cat = None
 
 savename = 'data/Robin/cls_pseudo_test_all' #/For all subcats combined
 # outfile = './image_list_robin_da_True.npz'
 # outfile = './robin_all_psuedo_img2.pickle'
 # outfile = './robin_psuedo_img.pickle'
-outfile = './vgg_bn_psuedorobincontext_img.pickle'
+outfile = da_init_path+'/vgg_tr_psuedooccludedrobin_img.pickle'
 # filez = np.load(outfile)
 # filez.files
 # img_pth = filez['arr_0']

@@ -103,12 +103,71 @@ class vMFMM:
 				if verbose:print("early stop at iter {0}, llk {1}".format(itt, self.mllk))
 				break
 
+	def fit_map(self, features, pre_mu, pre_pi, kappa, reg=0.3, max_it=300, tol = 5e-5, normalized=False, verbose=True):
+		self.features = features #* [512] element size, total size=24601600
+		if not normalized:
+			self.features = normalize_features(features)
+
+		self.n, self.d = self.features.shape
+		self.kappa = kappa #/ What is this?
+		self.reg = reg #/ regularisation constant for prior term in map
+
+		self.pi = np.random.random(self.cls_num)
+		self.pi /= np.sum(self.pi) #/ pi nows sums to one - membership of each vc? - mixture proportion?
+		if self.init_method =='random':
+			self.mu = np.random.random((self.cls_num, self.d))
+			self.mu = normalize_features(self.mu)
+		elif self.init_method =='k++':
+			centers = []
+			centers_i = []
+
+			if self.n > 50000:
+				rdn_index = np.random.choice(self.n, size=(50000,), replace=False)
+			else:
+				rdn_index = np.array(range(self.n), dtype=int)  #* (48050, )
+			
+			#* COSINE DISTANCE
+			cos_dis = 1-np.dot(self.features[rdn_index], self.features[rdn_index].T) #* [48050, 48050]
+
+			centers_i.append(np.random.choice(rdn_index)) # chooses a value between 0 and 48050
+			centers.append(self.features[centers_i[0]]) #* center initialized with a randomly chosen feature
+			for i in range(self.cls_num-1):
+
+				cdisidx = [np.where(rdn_index==cci)[0][0] for cci in centers_i]
+				prob = np.min(cos_dis[:,cdisidx], axis=1)**2 #? what's this?
+				prob /= np.sum(prob)
+				centers_i.append(np.random.choice(rdn_index, p=prob))
+				centers.append(self.features[centers_i[-1]])
+
+			self.mu = np.array(centers) #* [512, 512] i.e. 512 1D features of length 512
+			del(cos_dis)
+		#/ Load old VCs and update them with new data
+
+		# self.pre_p = pre_p
+		self.pre_mu = pre_mu
+		self.pre_pi = pre_pi
+		self.mu = pre_mu #! reassigning intialisation
+
+		self.mllk_rec = [] #/ IS THIS MAXIMUM LIKELIHOOD?
+		for itt in range(max_it):
+			_st = time.time()
+			self.e_map_step()
+			self.m_step()
+			_et = time.time()
+
+			self.mllk_rec.append(self.mllk)
+			print("Iter {0}, llk {1}".format(itt+1, self.mllk))
+			if len(self.mllk_rec)>1 and self.mllk - self.mllk_rec[-2] < tol:
+				if verbose:
+					print("early stop at iter {0}, llk {1}".format(itt+1, self.mllk))
+				break
+
 
 	def e_step(self):
 		# update p
 		logP = np.dot(self.features, self.mu.T)*self.kappa + np.log(self.pi).reshape(1,-1)  # n by k
 		logP_norm = logP - logsumexp(logP, axis=1).reshape(-1,1)
-		self.p = np.exp(logP_norm) #/ posterior
+		self.p = np.exp(logP_norm) #/ posterior/likelihood?
 		self.mllk = np.mean(logsumexp(logP, axis=1)) #/mean likelihood
 
 
@@ -121,7 +180,17 @@ class vMFMM:
 
 		self.mu = normalize_features(self.mu)
 
+	def e_map_step(self):
+		# update p
+		pre_logP = np.dot(self.features, self.pre_mu.T)*self.kappa + np.log(self.pre_pi).reshape(1,-1)  # n by k
+		pre_logP_norm = pre_logP - logsumexp(pre_logP, axis=1).reshape(-1,1)
+		# pre_p = np.exp(pre_logP_norm)
 
+		logP = np.dot(self.features, self.mu.T)*self.kappa + np.log(self.pi).reshape(1,-1)  # n by k
+		logP_norm = logP - logsumexp(logP, axis=1).reshape(-1,1)
+		# self.p = np.exp(logP_norm)
+		self.p = np.exp((logP_norm+(pre_logP_norm*self.reg))/(1+self.reg))
+		self.mllk = np.mean(logsumexp(logP, axis=1)) #/mean likelihood
 
 
 
