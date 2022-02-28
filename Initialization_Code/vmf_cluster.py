@@ -216,7 +216,7 @@ else:
         prev_p = pickle.load(fh)
     prev_pi = np.sum(prev_p, axis=0)/prev_p.shape[0]
     # model.fit_soft(features=feat_set, p=prev_p, mu=prev_mu, pi=prev_pi, kappa=vMF_kappa, max_it=150)
-    model.fit_map(feat_set, pre_mu=prev_mu, pre_pi=prev_pi, kappa=vMF_kappa, max_it=300)
+    model.fit_map(feat_set, pre_mu=prev_mu, pre_pi=prev_pi, reg=0.5,kappa=vMF_kappa, max_it=300)
     del(prev_p, prev_mu, prev_pi)
 
 if DA:

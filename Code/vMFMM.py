@@ -184,12 +184,13 @@ class vMFMM:
 		# update p
 		pre_logP = np.dot(self.features, self.pre_mu.T)*self.kappa + np.log(self.pre_pi).reshape(1,-1)  # n by k
 		pre_logP_norm = pre_logP - logsumexp(pre_logP, axis=1).reshape(-1,1)
-		# pre_p = np.exp(pre_logP_norm)
+		temp_p = np.exp(pre_logP_norm)
 
 		logP = np.dot(self.features, self.mu.T)*self.kappa + np.log(self.pi).reshape(1,-1)  # n by k
 		logP_norm = logP - logsumexp(logP, axis=1).reshape(-1,1)
 		# self.p = np.exp(logP_norm)
 		self.p = np.exp((logP_norm+(pre_logP_norm*self.reg))/(1+self.reg))
+		print("difference between posteriors {}".format(np.mean(np.absolute(temp_p-self.p))))
 		self.mllk = np.mean(logsumexp(logP, axis=1)) #/mean likelihood
 
 

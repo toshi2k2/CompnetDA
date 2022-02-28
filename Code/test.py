@@ -36,7 +36,7 @@ test_orig = True#False  #* test compnets with clean images
 corr = None#'snow'  # 'snow'
 vc_space = 0#2,3 # default=0
 save_scores,save_pseudo_image_list = False, False #!only implemented for one occlusion level
-bool_load_pretrained_model = True # False if you want to load initialization (see Initialization_Code/)
+bool_load_pretrained_model = False # False if you want to load initialization (see Initialization_Code/)
 
 bool_square_images = True#False
 # dataset= 'robin'#'pascal3d+'
@@ -152,7 +152,7 @@ if __name__ == '__main__':
         vc_file = vc_dir + 'best.pth'
         # outdir = vc_dir
         if cat==None:
-            vc_file = model_save_dir + 'vc{}_final/vc50.pth'.format(backbone_type)
+            vc_file = model_save_dir + 'vc{}_final/vc46.pth'.format(backbone_type)
         else:
             vc_file = model_save_dir + 'vc{}{}_final/vc50.pth'.format(backbone_type, cat[0])
         # vc_file = model_save_dir + 'train_pool5_a0_b0_vcTrue_mixTrue_occlikely0.6_vc512_lr_0.0001_pascal3d+_pretrainedFalse_epochs_50_occFalse_backbonevgg_tr_0/vc2.pth'
