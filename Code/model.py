@@ -349,19 +349,31 @@ class OcclusionMaskExtractor(nn.Module):
         return score, occ, part_scores
 
 
-def resnet_feature_extractor(type, layer='last'):
+def resnet_feature_extractor(type, layer='last', load_bbone=None):
+    #/ load_bbone = 'robin' means load baseline model
     extractor = nn.Sequential()
     if type == 'resnet50':
         net = models.resnet50(pretrained=True)
 
-        print("Loading robin trained model")
-        net.fc = torch.nn.Linear(net.fc.in_features, 12)
-        path = 'baseline_models/ROBIN-train-resnet50.pth'
-        if device_ids:
-            load_dict = torch.load(path, map_location='cuda:{}'.format(0))
-        else:
-            load_dict = torch.load(path, map_location='cpu')
-        net.load_state_dict(load_dict['state_dict'])
+        if load_bbone is not None:
+            if load_bbone == 'robin':
+                print("\nLoading resnet50 model backbone ROBIN-train-resnet50.pth\n")
+                net.fc = torch.nn.Linear(net.fc.in_features, 12)
+                path = 'baseline_models/ROBIN-train-resnet50.pth'
+            elif load_bbone == 'pascal':
+                print("\nLoading resnet50 model backbone 'baseline_models/pascal3d+None_lr_0.001_scratFalsepretrFalse_ep60_occFalse_backbresnet50_0/resnet5055.pth'\n")
+                net.fc = torch.nn.Linear(net.fc.in_features, 12)
+                path = 'baseline_models/pascal3d+None_lr_0.001_scratFalsepretrFalse_ep60_occFalse_backbresnet50_0/resnet5055.pth'
+            else:
+                print("\nLoading resnet50 model backbone {}\n".format(load_bbone))
+                net.fc = torch.nn.Linear(net.fc.in_features, 12)
+                # path = '../Robin/res50_bn/best.pth'
+                path = load_bbone
+            if device_ids:
+                load_dict = torch.load(path, map_location='cuda:{}'.format(0))
+            else:
+                load_dict = torch.load(path, map_location='cpu')
+            net.load_state_dict(load_dict['state_dict'])
 
         if layer == 'last':
             extractor.add_module('0', net.conv1)
@@ -407,7 +419,10 @@ def resnet_feature_extractor(type, layer='last'):
 class Conv1o1Layer(nn.Module):
     def __init__(self, weights, vc_neigh=0):
         super(Conv1o1Layer, self).__init__()
+        if torch.sum(torch.isnan(weights))>0:
+            raise RuntimeError
         self.weight = nn.Parameter(weights) #/ VC's, maybe?
+        # self.copy_w = self.weight
         self.vc_neigh = vc_neigh
     
     def input_reshape(self, x):
@@ -444,6 +459,8 @@ class Conv1o1Layer(nn.Module):
 
     def forward(self, x):
         weight = self.weight
+        if torch.sum(torch.isnan(weight))>0:
+            raise RuntimeError
         if self.vc_neigh > 0:
             # weight = weight[:,0:512,:,:]
             x = self.input_reshape2(x)

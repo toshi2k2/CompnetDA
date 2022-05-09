@@ -16,16 +16,34 @@ from torch.utils.data import DataLoader
 import numpy as np
 import math, random
 import torch
+import argparse
 
-DA = True
-corr = None#'snow'  # 'snow'
-mode = ''#'corres'  # * mixed: vc- corrupted, mixture - clean; '': vc and mix - corrupted;reverse:
+parser = argparse.ArgumentParser(description='Similarity matrix calculation')
+parser.add_argument('--da', type=bool, default=False, help='running DA or not')
+parser.add_argument('--corr', type=str, default=None, help='types of corruptions in dataset')
+parser.add_argument('--mode', type=str, default=None, help="DA mode - None, mixed,'',reverse")
+parser.add_argument('--robin_cat', type=int, default=None, help='None-all robin subcategories, else number')
+parser.add_argument('--vcs', type=int, default=0, help='size of VCs used')
+parser.add_argument('--retrain', type=bool, default=False, help='retrain VCs, then needs old VCs')
+parser.add_argument('--addata', type=bool, default=False, help='add data from training data')
+# parser.add_argument('--frc', type=float, default=0.9, help='used when addata is True. Proportion of current data that is added')
+parser.add_argument('--squareim', type=bool, default=False, help='use square images')
+parser.add_argument('--dataset', type=str, default=None, help='None-dataset in config files-else the one you choose')
+
+args = parser.parse_args()
+
+if args.dataset is not None:
+    dataset = args.dataset
+
+DA = args.da#True
+corr = args.corr#None#'snow'  # 'snow'
+mode = args.mode#''#'corres'  # * mixed: vc- corrupted, mixture - clean; '': vc and mix - corrupted;reverse:
            # * reverse: vc-clean, mix-corrupt; None, 'corres': correspondence dict b/w clean and corr VCs
-vc_space = 0#3
+vc_space = args.vcs#0#3
 ignore_edge = False#True # ignore edge of layer output - to reduce comptuations
-add_data = False # add data to current data
+add_data = args.addata#False # add data to current data
 
-bool_square_images = True#False
+bool_square_images = args.squareim#True#False
 paral_num = 10
 nimg_per_cat = 5000
 imgs_par_cat = np.zeros(len(categories))
@@ -38,7 +56,11 @@ if dataset in ['robin','pseudorobin']:
     categories.remove('bottle')
     cat_test = categories
     # cat = [robin_cats[4]]
-    cat = None
+    if args.robin_cat is None:
+        cat = args.robin_cat#None
+    else:
+        cat=[robin_cats[args.robin_cat]]
+    # cat = None
 
 if DA or mode in ['mixed', '', 'reverse']:
     if not os.path.exists(da_sim_dir):
@@ -74,9 +96,13 @@ for category in categories:  # * loading individual class categories
         if dataset in ['robin','pseudorobin']:
             print("Loading Robin test data (pseudo {})".format(dataset=='pseudorobin'))
             imgs, labels, masks = getImg('test', cat_test, dataset, data_path, [category], \
-                occ_level, occ_type, bool_load_occ_mask=False, subcat=cat) 
+                occ_level, occ_type, bool_load_occ_mask=False, subcat=cat)
+        elif dataset in ['pseudopascal', 'pascal3d+']:
+            print("Loading pascal3d+ test data (pseudo {})".format(dataset=='pseudopascal'))
+            imgs, labels, masks = getImg('test', cat_test, dataset, data_path, [category],\
+                occ_level, occ_type, bool_load_occ_mask=False, determinate=True, corruption=corr)            
         else:
-            print("Loading corrupted data")
+            print("Loading corrupted 'train' data")
             imgs, labels, masks = getImg('train', [category], dataset, data_path, cat_test,\
                 occ_level, occ_type, bool_load_occ_mask=False, determinate=True, corruption=corr)
     else:

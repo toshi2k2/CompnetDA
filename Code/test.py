@@ -18,29 +18,61 @@ import tqdm
 import torchvision.models as models
 from Initialization_Code.config_initialization import robin_cats
 import pickle
+import argparse
+import warnings
+warnings.filterwarnings("ignore")
+print("ignoring warnings")
 
 import torchvision
 u = UnNormalize()
 
+parser = argparse.ArgumentParser(description='Compnet testing')
+parser.add_argument('--da', type=bool, default=False, help='running DA or not')
+parser.add_argument('--corr', type=str, default=None, help='types of corruptions in dataset')
+# parser.add_argument('--saved_model', type=str, default='baseline_models/Robin-train-vgg_bn.pth', \
+#     help='loading saved model')
+parser.add_argument('--saved_model', type=str, default='baseline_models/pascal3d+None_lr_0.001_scratFalsepretrFalse_ep60_occFalse_backbvgg_bn_0/vgg_bn52.pth')
+parser.add_argument('--bbone', type=str, default='vgg_tr', help="Backbone type")
+parser.add_argument('--robin_cat', type=int, default=None, help='None-all robin subcategories, else number')
+parser.add_argument('--vcs', type=int, default=0, help='size of VCs used')
+parser.add_argument('--svescore', type=bool, default=False, help='save scores')
+parser.add_argument('--sveimglst', type=bool, default=False, help='save pseudo images list')
+parser.add_argument('--load', type=bool, default=False, help='Load pretrained models')
+parser.add_argument('--squareim', type=bool, default=True, help='use square images')
+parser.add_argument('--im_name', type=bool, default=False, help='get image paths/names as well-only for pascal3d+')
+parser.add_argument('--dataset', type=str, default=None, help='None-dataset in config files-else the one you choose')
+
+args = parser.parse_args()
+print(args)
+
+if args.dataset is not None:
+    dataset = args.dataset
+# print(args.load)
+
 if dataset in ['robin', 'pseudorobin', 'occludedrobin']:
     categories_train.remove('bottle')
     categories = categories_train
-    # cat = [robin_cats[4]]
-    cat = None
+    # cat = [robin_cats[2]]
+    # cat = None
+    if args.robin_cat is None:
+        cat = args.robin_cat#None
+    else:
+        cat=[robin_cats[args.robin_cat]]
     print("Testing Sub-Category(ies) {}\n".format(cat))
 else:
     cat = None
+    categories = categories_train
 
-DA = True
-test_orig = True#False  #* test compnets with clean images
-corr = None#'snow'  # 'snow'
-vc_space = 0#2,3 # default=0
-save_scores,save_pseudo_image_list = False, False #!only implemented for one occlusion level
-bool_load_pretrained_model = False # False if you want to load initialization (see Initialization_Code/)
+DA = args.da#True
+test_orig = False  #! test compnets with clean images-true for robin
+corr = args.corr#None#'snow'  # 'snow'
+vc_space = args.vcs#0#2,3 # default=0
+save_scores,save_pseudo_image_list = args.svescore,args.sveimglst#False, False #!only implemented for one occlusion level
+bool_load_pretrained_model = args.load#True # False if you want to load initialization (see Initialization_Code/)
 
-bool_square_images = True#False
-# dataset= 'robin'#'pascal3d+'
-backbone_type = 'vgg_tr' #'vgg_bn
+bool_square_images = args.squareim#True#False
+dataset= 'pseudopascal'#'pseudorobin'#'pascal3d+'
+backbone_type = args.bbone #'vgg_tr' #'vgg_bn, vgg_tr
 da_dict_dir = 'models/da_init_{}/dictionary_{}/dictionary_{}_{}.pickle'.format(backbone_type, backbone_type, layer, vc_num)
 da_mix_model_path = 'models/da_init_{}/mix_model_vmf_{}_EM_all'.format(backbone_type,dataset)
 dict_dir = 'models/init_{}/dictionary_{}/dictionary_{}_{}.pickle'.format(backbone_type,backbone_type, layer, vc_num)
@@ -50,7 +82,8 @@ mix_model_path = 'models/init_{}/mix_model_vmf_{}_EM_all'.format(backbone_type,d
 if backbone_type == 'vgg_tr':
     da_init_path+='_tr'
 
-dataset = 'occludedrobin' #'robin'
+dataset = 'pascal3d+'#'pascal3d+''occludedrobin' #'robin' #/ Needed for robin 
+
 print("{} Corruption Model is {} and clean test data is {}".format(corr, DA, test_orig))
 
 ###################
@@ -110,8 +143,9 @@ def test(models, test_data, occ_level, batch_size):
             correct[c_label] += np.sum(out == c_label)
 
             if np.max(temp)>=0.5:
-                pseudo_img_pth.append(test_data.images[i])
-                pseudo_labels.append(out)
+                if dataset in ['robin','pseudorobin', 'occludedrobin', 'pascal3d+']:
+                    pseudo_img_pth.append(test_data.images[i])
+                    pseudo_labels.append(out)
             # if out!= c_label and c_label == 5:
             #     im = torchvision.transforms.functional.to_pil_image(u(input[0]))
             #     im.save('results/fails/car_incorrect_%s_%s.png' % (corr, i))
@@ -152,9 +186,10 @@ if __name__ == '__main__':
         vc_file = vc_dir + 'best.pth'
         # outdir = vc_dir
         if cat==None:
-            vc_file = model_save_dir + 'vc{}_final/vc46.pth'.format(backbone_type)
+            vc_file = model_save_dir + 'da_init_{}/vc{}_final/vc59.pth'.format(backbone_type, backbone_type)
+            # vc_file = model_save_dir + 'init_{}/vc{}_final/vc60.pth'.format(backbone_type, backbone_type)
         else:
-            vc_file = model_save_dir + 'vc{}{}_final/vc50.pth'.format(backbone_type, cat[0])
+            vc_file = model_save_dir + 'vc{}{}_final/vc54.pth'.format(backbone_type, cat[0])
         # vc_file = model_save_dir + 'train_pool5_a0_b0_vcTrue_mixTrue_occlikely0.6_vc512_lr_0.0001_pascal3d+_pretrainedFalse_epochs_50_occFalse_backbonevgg_tr_0/vc2.pth'
     else:
         if DA:
@@ -192,13 +227,17 @@ if __name__ == '__main__':
     elif backbone_type =='vgg_tr':
         # saved_model = 'baseline_models/train_None_lr_0.01_pascal3d+_pretrained_False_epochs_15_occ_False_backbonevgg_0/vgg14.pth'
         # saved_model = 'baseline_models/snowadaptedvggbn.pth' # adapted vgg_bn
-        saved_model = 'baseline_models/Robin-train-vgg_bn.pth' # adapted vgg_bn for robin
+        saved_model = args.saved_model#'baseline_models/Robin-train-vgg_bn.pth' # adapted vgg_bn for robin
         load_dict = torch.load(saved_model, map_location='cuda:{}'.format(0))
         # tmp = models.vgg16(pretrained=False)
         tmp = models.vgg16_bn(pretrained=False)
         num_ftrs = tmp.classifier[6].in_features
         # tmp.classifier[6] = torch.nn.Linear(num_ftrs, len(categories_train))
-        tmp.classifier[6] = torch.nn.Linear(num_ftrs, 11)
+        # tmp.classifier[6] = torch.nn.Linear(num_ftrs, 11)
+        if dataset in ['robin', 'pseudorobin', 'occludedrobin']:
+            tmp.classifier[6] = torch.nn.Linear(num_ftrs, 11)
+        else:
+            tmp.classifier[6] = torch.nn.Linear(num_ftrs, len(categories_train))
         tmp.load_state_dict(load_dict['state_dict'])
         tmp.eval()
         if layer=='pool4':
@@ -207,7 +246,7 @@ if __name__ == '__main__':
             extractor = tmp.features
     elif backbone_type=='resnet50' or backbone_type == 'resnet18' or backbone_type == 'resnext' \
         or backbone_type=='densenet':
-        extractor = resnet_feature_extractor(backbone_type, layer)
+        extractor = resnet_feature_extractor(backbone_type, layer, load_bbone=args.saved_model)
 
     extractor.cuda(device_ids[0]).eval()
 
@@ -264,15 +303,18 @@ if __name__ == '__main__':
             if test_orig == False:
                 print("Loading corrupted test data")
                 test_imgs, test_labels, masks = getImg('test', categories_train, dataset,data_path, \
-                    categories, occ_level, occ_type,bool_load_occ_mask=True, determinate=True, corruption=corr)  # masks is empty for some reason
+                    categories, occ_level, occ_type,bool_load_occ_mask=False, determinate=True, corruption=corr)  # masks is empty for some reason
             else:
                 print("Loading Clean test data")
                 test_imgs, test_labels, masks = getImg('test', categories_train, dataset,data_path, \
-                    categories, occ_level, occ_type,bool_load_occ_mask=True, subcat=cat)  # masks is empty for some reason
+                    categories, occ_level, occ_type,bool_load_occ_mask=False, subcat=cat)  # masks is empty for some reason
             print('Total imgs for test of occ_level {} and occ_type {} '.format(occ_level, occ_type) + str(len(test_imgs)))
             # input()
             if test_orig is False and occ_level != 'ZERO':
                 errs = ["data/pascal3d+_occ_{}/carLEVEL{}/n03770679_14513_2.JPEG".format(corr, occ_level)]
+                imb = ['n03141327_11602_2','n03141327_1483_2','n03141327_7818_4','n04196502_30925_5']
+                for ib in imb:
+                    errs.append("data/pascal3d+_occ_{}/boatLEVEL{}/{}.JPEG".format(corr, occ_level, ib))
                 # errs = ['data/pascal3d+_occ_snow/carLEVELONE/n03770679_14513_2.JPEG', 'data/pascal3d+_occ_snow/carLEVELFIVE/n03770679_14513_2.JPEG', 'data/pascal3d+_occ_snow/carLEVELNINE/n03770679_14513_2.JPEG']
             else:
                 errs = []

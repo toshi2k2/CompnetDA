@@ -24,11 +24,13 @@ backbone_type='vgg_bn'
 # saved_model = 'baseline_models/train_None_lr_0.01_{}_scratchFalsespretrained_False_epochs_50_occ_False_backbone{}_0/{}3.pth'.format(dataset, backbone_type, backbone_type)
 # saved_model = 'baseline_models/train_None_lr_0.0001_robin_scratchFalsepretrained_False_epochs_100_occ_False_backboneresnet50_0/resnet5047.pth'
 # saved_model = 'baseline_models/train_None_lr_0.01_pascal3d+_scratchTruepretrained_True_epochs_50_occ_False_backbonevgg_0/vgg1.pth'
-# saved_model = 'baseline_models/train_None_lr_0.01_robin_scratchFalsepretrained_False_epochs_50_occ_False_backbonevgg_bn_0/vgg_bn3.pth'
-saved_model = '/mnt/sda1/cl_reps/Robin/vggbnshape_bn/best.pth'
+saved_model = 'baseline_models/train_None_lr_0.01_robin_scratchFalsepretrained_False_epochs_50_occ_False_backbonevgg_bn_0/vgg_bn3.pth'
+# saved_model = 'baseline_models/motion_blur_adapted_vgg_bn_pascal3d+.pth'
+# saved_model = 'baseline_models/pascal3d+testsnow_lr_0.001_scratFalsepretrFalse_ep60_occFalse_backbvgg_bn_0/vgg_bn58.pth'
+saved_model = '/mnt/sda1/cl_reps/Robin/vggbncontext_rpl/best.pth'
 # saved_model = 'baseline_models/ROBIN-train-resnet50.pth'
 # saved_model = 'baseline_models/robinNone_lr_0.001_scratFalsepretrFalse_ep60_occFalse_backbvgg_bn_0/vgg_bn51.pth'
-corr = None#'snow'
+corr = None#'motion_blur'
 # backbone_type = 'resnet50'
 bool_square_images=True
 dataset = 'occludedrobin'
@@ -40,8 +42,10 @@ if dataset in ['robin', 'psuedorobin', 'occludedrobin']:
 	# occ_levels = ['ZERO']
 	categories_train.remove('bottle')
 	categories = categories_train
-	# robin_cats = [''] # option will run on entire robin testset
-	robin_cats = ['shape']
+	robin_cats = [''] # option will run on entire robin testset
+	robin_cats = ['context']
+elif dataset in ['pascal3d+']:
+	robin_cats = ['']
 
 if dataset in ['robin', 'psuedorobin']:
 	occ_levels = ['ZERO']
@@ -110,6 +114,7 @@ if __name__ == '__main__':
 	elif backbone_type=='vgg_bn':
 		model = models.vgg16_bn(pretrained=True)
 		model.classifier[6]  = torch.nn.Linear(4096, len(categories_train))
+		# model.classifier[6]  = torch.nn.Linear(4096, 12)
 	elif backbone_type == 'resnet18' or backbone_type == 'resnext' or \
 		backbone_type=='densenet':
 		exit("baselines {} not implemented".format(backbone_type))
@@ -148,19 +153,24 @@ if __name__ == '__main__':
 				elif dataset in ['robin','occludedrobin']:
 					print(cat)
 					cat=[cat]
+				elif dataset in ['pascal3d+']:
+					cat=None
 				# load images
 				if corr is not None:
 					print("Loading corrupted data\n")
 					test_imgs, test_labels, masks = getImg('test', categories_train, dataset,data_path, \
-						categories, occ_level, occ_type,bool_load_occ_mask=True, determinate=True, corruption=corr)
+						categories, occ_level, occ_type,bool_load_occ_mask=False, determinate=True, corruption=corr)
 				else:
 					test_imgs, test_labels, masks = getImg('test', categories_train, dataset,data_path, \
-						categories, occ_level, occ_type,bool_load_occ_mask=True, subcat=cat)
+						categories, occ_level, occ_type,bool_load_occ_mask=False, subcat=cat)
 
 				#* removing an image due to errors
 				if corr is not None:
 					errs = ["data/pascal3d+_occ_{}/carLEVEL{}/n03770679_14513_2.JPEG".format(corr, occ_level)]
-					# errs = ['data/pascal3d+_occ_snow/carLEVELONE/n03770679_14513_2.JPEG', 'data/pascal3d+_occ_snow/carLEVELFIVE/n03770679_14513_2.JPEG', 'data/pascal3d+_occ_snow/carLEVELNINE/n03770679_14513_2.JPEG']
+					errs = ["data/pascal3d+_occ_{}/carLEVEL{}/n03770679_14513_2.JPEG".format(corr, occ_level)]
+					imb = ['n03141327_11602_2','n03141327_1483_2','n03141327_7818_4','n04196502_30925_5']
+					for ib in imb:
+						errs.append("data/pascal3d+_occ_{}/boatLEVEL{}/{}.JPEG".format(corr, occ_level, ib))
 					for es in errs:
 						if es in test_imgs:
 							idx_rm = test_imgs.index(es)

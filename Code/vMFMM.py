@@ -155,8 +155,10 @@ class vMFMM:
 			self.m_step()
 			_et = time.time()
 
+			# self.reg = max(0.05, self.reg-0.02) #/ changing reg
+
 			self.mllk_rec.append(self.mllk)
-			print("Iter {0}, llk {1}".format(itt+1, self.mllk))
+			print("Iter {0}, Reg{1}, llk {2}".format(itt+1, self.reg, self.mllk))
 			if len(self.mllk_rec)>1 and self.mllk - self.mllk_rec[-2] < tol:
 				if verbose:
 					print("early stop at iter {0}, llk {1}".format(itt+1, self.mllk))
@@ -193,5 +195,13 @@ class vMFMM:
 		print("difference between posteriors {}".format(np.mean(np.absolute(temp_p-self.p))))
 		self.mllk = np.mean(logsumexp(logP, axis=1)) #/mean likelihood
 
+	# def e_cos_step(self):
+	# 	# update p
+	# 	logP = np.dot(self.features, self.mu.T)*self.kappa + np.log(self.pi).reshape(1,-1)  # n by k
+	# 	logP_norm = logP - logsumexp(logP, axis=1).reshape(-1,1)
+	# 	# self.p = np.exp(logP_norm)
+	# 	self.p = np.exp((logP_norm+(pre_logP_norm*self.reg))/(1+self.reg))
+	# 	print("difference between posteriors {}".format(np.mean(np.absolute(temp_p-self.p))))
+	# 	self.mllk = np.mean(logsumexp(logP, axis=1)) #/mean likelihood
 
 

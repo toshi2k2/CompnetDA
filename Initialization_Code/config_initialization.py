@@ -8,17 +8,23 @@ device_ids = [0]
 data_path = 'data/'
 model_save_dir = 'models/'
 
-dataset = 'pseudorobin' # pascal3d+, coco, robin, pseudorobin
-nn_type = 'vgg_tr' #vgg, vgg_bn, vgg_tr, resnet50, resnext, resnet152
+dataset = 'pascal3d+' # pascal3d+, coco, robin, pseudorobin, pseudopascal
+nn_type = 'resnet50' #vgg, vgg_bn, vgg_tr, resnet50, resnext, resnet152
 vMF_kappa=30
 vc_num = 512
 vc_shape = 0#0
+
+#/None, 'pascal', 'robin'
+resnet50_bbone = 'baseline_models/gaussian_blur_adapted_resnet50_pascal3d+.pth'
+
 
 # categories = ['aeroplane', 'bicycle', 'boat', 'bottle', 'bus', 'car', 'chair', 'diningtable', 'motorbike', 'sofa',
 # 			  'train']
 categories = ['aeroplane', 'bicycle', 'boat', 'bottle', 'bus', 'car', 'chair', 'diningtable', 'motorbike', 'sofa',
 			  'train', 'tvmonitor']
-cat_test = ['aeroplane', 'bicycle', 'bus', 'car', 'motorbike', 'train']
+cat_test = ['aeroplane', 'bicycle', 'boat', 'bottle', 'bus', 'car', 'chair', 'diningtable', 'motorbike', 'sofa',
+			  'train', 'tvmonitor']
+# cat_test = ['aeroplane', 'bicycle', 'bus', 'car', 'motorbike', 'train']
 robin_cats = ['context', 'weather', 'texture', 'pose', 'shape']
 
 if nn_type =='vgg':
@@ -35,11 +41,12 @@ elif nn_type =='vgg_bn':
 		extractor = models.vgg16_bn(pretrained=True).features
 elif nn_type =='vgg_tr':
 	"""VGG model trained from scratch or pretrained"""
-	print("Loading robin trained model")
+	print("Loading pre-trained model")
 	layer = 'pool5'  # 'pool5','pool4'
 	# saved_model = 'baseline_models/train_None_lr_0.01_pascal3d+_pretrained_False_epochs_15_occ_False_backbonevgg_0/vgg14.pth'
+	# saved_model = 'baseline_models/pascal3d+None_lr_0.001_scratFalsepretrFalse_ep60_occFalse_backbvgg_bn_0/vgg_bn52.pth'
+	# saved_model = 'baseline_models/snow_adapted_vgg_bn_pascal3d+.pth' # adapted vgg_bn
 	saved_model = 'baseline_models/Robin-train-vgg_bn.pth' # adapted vgg_bn
-	# saved_model = 'baseline_models/None_adapted_vgg_bn_robin.pth' # adapted vgg_bn for robin
 	# saved_model = 'baseline_models/robinNone_lr_0.001_scratFalsepretrFalse_ep60_occFalse_backbvgg_bn_0/vgg_bn51.pth'
 	load_dict = torch.load(saved_model, map_location='cuda:{}'.format(0))
 	# tmp = models.vgg16(pretrained=False)
@@ -55,7 +62,8 @@ elif nn_type =='vgg_tr':
 	extractor = tmp.features
 elif nn_type[:6]=='resnet' or nn_type=='resnext' or nn_type=='alexnet':
 	layer = 'last' # 'last','second'
-	extractor=resnet_feature_extractor(nn_type,layer)
+	# extractor=resnet_feature_extractor(nn_type,layer)
+	extractor=resnet_feature_extractor(nn_type,layer,load_bbone=resnet50_bbone) #!change this
 
 extractor.cuda(device_ids[0]).eval()
 

@@ -14,24 +14,39 @@ import tqdm
 import torchvision.models as models
 import robusta, copy
 from Initialization_Code.config_initialization import robin_cats
+import warnings, argparse
+warnings.filterwarnings("ignore")
+print("ignoring warnings")
 
 import torchvision
 u = UnNormalize()
 
+parser = argparse.ArgumentParser(description='Mixture Model Calculation')
+parser.add_argument('--corr', type=str, default=None, help='types of corruptions in dataset')
+# parser.add_argument('--squareim', type=bool, default=True, help='use square images')
+# parser.add_argument('--dataset', type=str, default=None, help='None-dataset in config files-else the one you choose')
+# parser.add_argument('--bn_adapt', type=bool, default=False, help='Use Batchnorm adapt')
+
+args = parser.parse_args()
+
+
 ###################
 # Test parameters #
 ###################
+saved_model = 'baseline_models/pascal3d+None_lr_0.001_scratFalsepretrFalse_ep60_occFalse_backbvgg_bn_0/vgg_bn52.pth'
+saved_model = 'baseline_models/pascal3d+None_lr_0.001_scratFalsepretrFalse_ep60_occFalse_backbresnet50_0/resnet5055.pth'
 # saved_model = 'baseline_models/ROBIN-train-resnet50.pth'
-saved_model = 'baseline_models/robinNone_lr_0.001_scratFalsepretrFalse_ep60_occFalse_backbvgg_bn_0/vgg_bn50.pth'
+# saved_model = 'baseline_models/robinNone_lr_0.001_scratFalsepretrFalse_ep60_occFalse_backbvgg_bn_0/vgg_bn50.pth'
+
 # saved_model = 'baseline_models/train_None_lr_0.01_pascal3d+_pretrained_False_epochs_15_occ_False_backbonevgg_bn_0/vgg_bn12.pth'
 # saved_model = 'models_old/best.pth'
 # saved_model = 'baseline_models/train_None_lr_0.01_robin_scratchFalsepretrained_False_epochs_50_occ_False_backbonevgg_bn_0/vgg_bn3.pth'
 # saved_model = 'baseline_models/train_None_lr_0.01_pascal3d+_pretrained_False_epochs_15_occ_False_backbonevgg_0/vgg14.pth'
 # saved_model = 'baseline_models/train_None_lr_0.01_pascal3d+_scratchTruepretrained_True_epochs_50_occ_False_backbonevgg_0/vgg1.pth'
-corr = None#'snow'
+corr = args.corr#'motion_blur'
 rbsta=True
-backbone_type = 'vgg_bn' #vgg_bn, resnet50
-save_checkpt = False
+backbone_type = 'resnet50' #vgg_bn, resnet50
+save_checkpt = True#False
 robin_all = False # run on all robin test nuisance altogether
 check_changed_pmtr = False # check what parameters are training - run at least once for debugging
 
@@ -47,7 +62,9 @@ if dataset == 'robin':
 	occ_levels = ['ZERO']
 	categories_train.remove('bottle')
 	categories = categories_train
-else: robin_cats = ['']
+else: 
+    robin_cats = ['']
+    categories = categories_train
 if robin_all:
     robin_cats = ['']
 
@@ -92,10 +109,10 @@ def test(models, test_data, batch_size):
 	return test_acc, scores
 
 
-def adapt(models, test_data, batch_size, robust_da, epochs=10, lr=1e-6):
+def adapt(models, test_data, batch_size, robust_da, epochs=1, lr=1e-6):
     test_loader = DataLoader(dataset=test_data, batch_size=batch_size, shuffle=True)
     print('Adapting')
-    nclasses = 12 # models[0].num_classes
+    nclasses = len(categories)#12 # models[0].num_classes
     correct = np.zeros(nclasses)
     total_samples = np.zeros(nclasses)
     scores = np.zeros((0,nclasses))
@@ -299,10 +316,10 @@ if __name__ == '__main__':
                 # load images
                 if corr is not None:
                     print("Loading corrupted data\n")
-                    train_imgs, train_labels, train_masks = getImg('train', categories_train, dataset,data_path, \
-                        categories, occ_level, occ_type,bool_load_occ_mask=True, determinate=True, corruption=corr)
-                    # test_imgs, test_labels, masks = getImg('test', categories_train, dataset,data_path, \
+                    # train_imgs, train_labels, train_masks = getImg('train', categories_train, dataset,data_path, \
                     #     categories, occ_level, occ_type,bool_load_occ_mask=True, determinate=True, corruption=corr)
+                    train_imgs, train_labels, train_masks = getImg('test', categories_train, dataset,data_path, \
+                        categories, occ_level, occ_type,bool_load_occ_mask=False, determinate=True, corruption=corr)
                 else:
                     print("Loading clean data\n")
                     if dataset == 'robin':
@@ -312,10 +329,10 @@ if __name__ == '__main__':
                             cat = [cat]
                         print("Loading {} subcategory\n".format(cat))
                         train_imgs, train_labels, train_masks = getImg('test', categories_train, dataset,data_path, \
-                            categories, occ_level, occ_type,bool_load_occ_mask=True, subcat=cat)
+                            categories, occ_level, occ_type,bool_load_occ_mask=False, subcat=cat)
                     else:
                         train_imgs, train_labels, train_masks = getImg('train', categories_train, dataset,data_path, \
-                            categories, occ_level, occ_type,bool_load_occ_mask=True)
+                            categories, occ_level, occ_type,bool_load_occ_mask=False)
                     # test_imgs, test_labels, masks = getImg('test', categories_train, dataset,data_path, \
                     #     categories, occ_level, occ_type,bool_load_occ_mask=True)
                 
@@ -360,15 +377,22 @@ for occ_level in occ_levels:
         if corr is not None:
             print("Loading corrupted data\n")
             test_imgs, test_labels, masks = getImg('test', categories_train, dataset,data_path, \
-                categories, occ_level, occ_type,bool_load_occ_mask=True, determinate=True, corruption=corr)
+                categories, occ_level, occ_type,bool_load_occ_mask=False, determinate=True, corruption=corr)
         else:
             print("Loading clean data\n")
             test_imgs, test_labels, masks = getImg('test', categories_train, dataset,data_path, \
-                categories, occ_level, occ_type,bool_load_occ_mask=True)
+                categories, occ_level, occ_type,bool_load_occ_mask=False)
         
         #* removing an image due to errors
         if corr is not None:
-            errs = ['data/pascal3d+_occ_snow/carLEVELONE/n03770679_14513_2.JPEG', 'data/pascal3d+_occ_snow/carLEVELFIVE/n03770679_14513_2.JPEG', 'data/pascal3d+_occ_snow/carLEVELNINE/n03770679_14513_2.JPEG']
+            errs = ['data/pascal3d+_occ_snow/carLEVELONE/n03770679_14513_2.JPEG', \
+                'data/pascal3d+_occ_snow/carLEVELFIVE/n03770679_14513_2.JPEG', 'data/pascal3d+_occ_snow/carLEVELNINE/n03770679_14513_2.JPEG']
+            imb = ['n03141327_11602_2','n03141327_1483_2','n03141327_7818_4','n04196502_30925_5','n03770679_14513_2']
+            car_imb = ['n03770679_14513_2']
+            for ib in imb:
+                errs.append("data/pascal3d+_occ_{}/boatLEVEL{}/{}.JPEG".format(corr, occ_level, ib))
+            for ib in car_imb:
+                errs.append("data/pascal3d+_occ_{}/carLEVEL{}/{}.JPEG".format(corr, occ_level, ib))
             for es in errs:
                 if es in test_imgs:
                     idx_rm = test_imgs.index(es)
@@ -380,7 +404,7 @@ for occ_level in occ_levels:
         print('Total imgs for test of occ_level {} and occ_type {} '.format(occ_level, occ_type) + str(len(test_imgs)))
         """test_imgs is list of image path and name strings"""
         # get image loader
-        test_imgset = Imgset(test_imgs, masks, test_labels, imgLoader, bool_square_images=False)
+        test_imgset = Imgset(test_imgs, masks, test_labels, imgLoader, bool_square_images=True)
         # test_imgset = train_imgset
         # compute test accuracy
         acc, scores = test(models=model, test_data=test_imgset, batch_size=1)

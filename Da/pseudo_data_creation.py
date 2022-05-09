@@ -9,26 +9,55 @@ from Initialization_Code.config_initialization import vc_num, dataset, categorie
         model_save_dir, da_init_path
 import pickle
 from shutil import copyfile, rmtree
+import argparse
 
-overwrite_folder = True
+parser = argparse.ArgumentParser(description='Mixture Model Calculation')
+# parser.add_argument('--da', type=bool, default=True, help='running DA or not')
+parser.add_argument('--corr', type=str, default=None, help='types of corruptions in dataset')
+# parser.add_argument('--saved_model', type=str, default='baseline_models/Robin-train-vgg_bn.pth', help='loading saved model')
+parser.add_argument('--bbone', type=str, default='vgg_tr', help="Backbone type")
+parser.add_argument('--robin_cat', type=int, default=None, help='None-all robin subcategories, else number')
+# parser.add_argument('--vcs', type=int, default=0, help='size of VCs used')
+parser.add_argument('--of', type=bool, default=False, help='overwrite folder')
+# parser.add_argument('--sveimglst', type=bool, default=False, help='save pseudo images list')
+# parser.add_argument('--load', type=bool, default=True, help='Load pretrained models')
+# parser.add_argument('--squareim', type=bool, default=True, help='use square images')
+parser.add_argument('--dataset', type=str, default='robin', help='None-dataset in config files-else \
+    the one you choose')
 
-dataset='robin'
-assert(dataset in ['robin','pseudorobin'])
+args = parser.parse_args()
+
+if args.dataset is not None:
+    dataset = args.dataset
+
+overwrite_folder = args.of#True
+
+# dataset='robin'
+assert(dataset in ['robin','pseudorobin', 'pascal3d+'])
 if dataset == 'robin':
     categories.remove('bottle')
     cat_test = categories
     # cat = [robin_cats[4]]
-    cat = None
+    # cat = None
+    if args.robin_cat is None:
+        cat = args.robin_cat#None
+    else:
+        cat=[robin_cats[args.robin_cat]]
 
-savename = 'data/Robin/cls_pseudo_test_all' #/For all subcats combined
-# outfile = './image_list_robin_da_True.npz'
-# outfile = './robin_all_psuedo_img2.pickle'
-# outfile = './robin_psuedo_img.pickle'
-outfile = da_init_path+'/vgg_tr_psuedooccludedrobin_img.pickle'
-# filez = np.load(outfile)
-# filez.files
-# img_pth = filez['arr_0']
-# img_label = filez['arr_1']
+    savename = 'data/Robin/cls_pseudo_test_all' #/For all subcats combined
+    # outfile = './image_list_robin_da_True.npz'
+    # outfile = './robin_all_psuedo_img2.pickle'
+    # outfile = './robin_psuedo_img.pickle'
+    outfile = da_init_path+'/{}_psuedooccludedrobin_img.pickle'.format(args.bbone)
+    # filez = np.load(outfile)
+    # filez.files
+    # img_pth = filez['arr_0']
+    # img_label = filez['arr_1']
+elif dataset in ['pascal3d+']:
+    cat_test = categories
+    savename = 'data/pseudo_pascal3d+_occ'+args.corr
+    outfile = da_init_path+'/{}_psuedopascal3d+_img.pickle'.format(args.bbone)
+
 with open(outfile, 'rb') as fh:
     img_pth, img_label = pickle.load(fh)
 

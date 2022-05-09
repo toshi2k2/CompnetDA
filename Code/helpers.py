@@ -160,7 +160,9 @@ def getImg(mode,categories, dataset, data_path, cat_test=None, occ_level='ZERO',
 	#* determinate = True # for using fixed corrupted dataset - only for pascal3d and no occlusion
 	#* corruption = type of corruption used - cannot be one for determinate = True
 	#* subcat = subcategory filter in robin dataset
+	# print(determinate, corruption, determinate and (corruption is not None))
 	assert(determinate and (corruption is not None) or not determinate and (corruption is None))
+	# assert(img_name and (dataset=='pascal3d+'))
 	if dataset=='occludedrobin' and occ_level=='ZERO' and mode=='test':
 		print("\nLEVEL ZERO of occludedrobin is robin\n")
 		dataset='robin'
@@ -296,6 +298,15 @@ def getImg(mode,categories, dataset, data_path, cat_test=None, occ_level='ZERO',
 					label = categories.index(category)
 					test_labels += [label]*len(img_list)
 					occ_imgs += [False,False]*len(img_list)
+			elif dataset == 'pseudopascal':
+				img_dir = './' + data_path + 'pseudo_pascal3d+_occ{}/{}/'.format(corruption,category)
+				print("Loading pseudo pascal from {}".format(img_dir))
+				img_list = os.listdir(img_dir)
+				img_list = [img_dir + s for s in img_list]
+				test_imgs += img_list
+				label = categories.index(category)
+				test_labels += [label]*len(img_list)
+				occ_imgs += [False,False]*len(img_list)
 
 			if dataset in ['pascal3d+','coco']:
 				if os.path.exists(filelist):
@@ -309,8 +320,10 @@ def getImg(mode,categories, dataset, data_path, cat_test=None, occ_level='ZERO',
 							if occ_level=='ZERO':
 								img = img_dir + occ_type + '/' + img_path[:-2] + '.JPEG'
 								occ_img1 = []
-								# occ_img2 = []
-								occ_img2 = occ_mask_dir_obj + '/' + img_path + '.png'
+								if bool_load_occ_mask:
+									occ_img2 = occ_mask_dir_obj + '/' + img_path + '.png'
+								else:
+									occ_img2 = []
 							else:
 								img = img_dir + occ_type + '/' + img_path + '.JPEG'
 								if bool_load_occ_mask:
@@ -327,6 +340,9 @@ def getImg(mode,categories, dataset, data_path, cat_test=None, occ_level='ZERO',
 
 						test_imgs.append(img)
 						test_labels.append(label)
+						# if img_name:
+						# 	occ_imgs.append([occ_img1,occ_img2,img_path])
+						# else:
 						occ_imgs.append([occ_img1,occ_img2])
 				else:
 					print('FILELIST NOT FOUND: {}'.format(filelist))
@@ -444,22 +460,29 @@ def imgLoader(img_path,mask_path,bool_resize_images=True,bool_square_images=Fals
 	return img, mask
 
 class Imgset():
-	def __init__(self, imgs, masks, labels, loader,bool_square_images=False):
+	def __init__(self, imgs, masks, labels, loader,bool_square_images=False,ret_name=False):
 		self.images = imgs
 		self.masks 	= masks
 		self.labels = labels
 		self.loader = loader
 		self.bool_square_images = bool_square_images
+		self.return_name = ret_name
 
 	def __getitem__(self, index):
 		fn = self.images[index]
 		label = self.labels[index]
 		mask = self.masks[index]
 		img,mask = self.loader(fn,mask,bool_resize_images=True,bool_square_images=self.bool_square_images)
-		return img, mask, label
+		if self.return_name:
+			return img, mask, label, fn
+		else:
+			return img, mask, label
 
 	def __len__(self):
 		return len(self.images)
+
+	def __imgname__(self, index):
+		return self.images[index]
 
 def save_checkpoint(state, filename, is_best):
 	if is_best:

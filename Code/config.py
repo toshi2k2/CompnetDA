@@ -86,9 +86,11 @@ _C = config     # short alias to avoid coding
 _C.NAME = 'default'
 
 # options: 'pascal3d+', 'mnist', 'cifar10', 'coco', 'robin', pseudorobin
-_C.DATA.DATASET = 'pseudorobin'
+_C.DATA.DATASET = 'pascal3d+'
 # categories for testing (vehicles only)
-_C.DATA.CATEGORY = ['aeroplane', 'bicycle', 'bus', 'car', 'motorbike', 'train']
+# _C.DATA.CATEGORY = ['aeroplane', 'bicycle', 'bus', 'car', 'motorbike', 'train']
+_C.DATA.CATEGORY = ['aeroplane', 'bicycle', 'boat', 'bottle', 'bus', 'car',
+                          'chair', 'diningtable', 'motorbike', 'sofa', 'train', 'tvmonitor']
 # categories for training
 # _C.DATA.CATEGORY_TRAIN = ['aeroplane', 'bicycle', 'boat', 'bottle', 'bus', 'car',
 #                           'chair', 'diningtable', 'motorbike', 'sofa', 'train']
@@ -113,9 +115,9 @@ _C.MODEL.MIXTURE_NUM = 4 # number of mixture models per class
 # 'second' if _C.MODEL.BACKBONE_TYPE is 'resnet50', 'resnext'. None
 # means default layer, i.e. 'pool5' for 'vgg' and 'last' for 'resnet50',
 # 'resnext', 'densenet'.
-_C.MODEL.LAYER = 'pool5'#'pool5','last'
+_C.MODEL.LAYER = 'last'#'pool5','last'
 # options: 'vgg', 'resnet50', 'resnext'
-_C.MODEL.BACKBONE_TYPE = 'vgg' #'vgg', 'resnet50
+_C.MODEL.BACKBONE_TYPE = 'resnet50' #'vgg', 'resnet50
 
 ###############################################################################
 # Training configs

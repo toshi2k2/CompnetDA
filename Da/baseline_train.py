@@ -44,7 +44,7 @@ if bool_train_with_occluders:
 else:
 	occ_levels_train = ['ZERO']
 
-backbone_type = 'resnet50'
+backbone_type = 'resnet50'#'vgg_bn'
 
 out_dir = vggmodel_dir + '/{}{}_lr_{}_scrat{}pretr{}_ep{}_occ{}_backb{}_{}/'.format(dataset,corr, lr, scratch,\
 	bool_load_pretrained_model,ncoord_it,bool_train_with_occluders,backbone_type,device_ids[0])

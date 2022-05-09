@@ -16,20 +16,45 @@ from torch.utils.data import DataLoader
 import cv2
 import glob
 import pickle, random
+import argparse
 
 u = UnNormalize()
 
-DA = True
-corr = None#'snow'  # 'snow'
-backgnd_corr = None # backgnd corruption - if None corr will be applied to entire image
+parser = argparse.ArgumentParser(description='vMF clustering')
+parser.add_argument('--da', type=bool, default=False, help='running DA or not')
+parser.add_argument('--corr', type=str, default=None, help='types of corruptions in dataset')
+parser.add_argument('--cortest', type=bool, default=False, help='use corrupted test set as data - only for pascal3d+')
+parser.add_argument('--back_cor', type=str, default=None, help='background corruption - if None, corruption is applied to entire image')
+parser.add_argument('--robin_cat', type=int, default=None, help='None-all robin subcategories, else number')
+parser.add_argument('--vcs', type=int, default=0, help='size of VCs used')
+parser.add_argument('--retrain', type=bool, default=False, help='retrain VCs, then needs old VCs')
+parser.add_argument('--addata', type=bool, default=False, help='add data from training data')
+parser.add_argument('--frc', type=float, default=0.9, help='used when addata is True. Proportion of current data that is added')
+parser.add_argument('--squareim', type=bool, default=False, help='use square images')
+parser.add_argument('--dataset', type=str, default=None, help='None-dataset in config files-else the one you choose')
+
+args = parser.parse_args()
+
+if args.dataset is not None:
+    dataset = args.dataset
+
+if args.corr == None:
+    assert(args.cortest==False)
+
+DA = args.da #True
+corr = args.corr# None#'snow'  # 'snow'
+backgnd_corr = args.back_cor#None # backgnd corruption - if None corr will be applied to entire image
 # cat  = [robin_cats[4]] #/ for individual sub-cats
-cat = None
+if args.robin_cat is None:
+    cat = args.robin_cat#None
+else:
+    cat=[robin_cats[args.robin_cat]]
 # offset = 2 #/ should
-vc_space = 0#3
-retrain_vc = True
-add_data = False
-frc = 0.9
-bool_square_images=True#False
+vc_space = args.vcs#0#3
+retrain_vc = args.retrain#True
+add_data = args.addata#False
+frc = args.frc#0.9
+bool_square_images= args.squareim#True#False
 
 img_per_cat = 1000  # image per category
 if add_data:
@@ -47,6 +72,8 @@ if dataset == 'robin':
     categories.remove('bottle')
     cat_test = categories
     print("Category {}".format(cat))
+else:
+    cat_test = categories
 
 #* imgs is the image paths array/list
 if DA:
@@ -55,20 +82,31 @@ if DA:
         imgs, labels, masks = getImg('test', categories, dataset, data_path, cat_test, \
             occ_level, occ_type, bool_load_occ_mask=False, subcat=cat)    
     else:
-        print("Loading {} train data".format(dataset))
-        imgs, labels, masks = getImg('train', categories, dataset, data_path, cat_test, \
-            occ_level, occ_type, bool_load_occ_mask=False, determinate=True, corruption=corr, \
-                corr_bck=backgnd_corr)
+        if args.cortest:
+            print("Loading {} {} test data".format(dataset, corr))
+            imgs, labels, masks = getImg('test', categories, dataset, data_path, cat_test, \
+                occ_level, occ_type, bool_load_occ_mask=False, determinate=True, corruption=corr, \
+                    corr_bck=backgnd_corr)
+        else:
+            print("Loading {} {} train data".format(dataset, corr))
+            imgs, labels, masks = getImg('train', categories, dataset, data_path, cat_test, \
+                occ_level, occ_type, bool_load_occ_mask=False, determinate=True, corruption=corr, \
+                    corr_bck=backgnd_corr)
 else:
     print("Loading {} train data".format(dataset))
     imgs, labels, masks = getImg('train', categories, dataset, data_path, cat_test, \
     occ_level, occ_type, bool_load_occ_mask=False)
 #/############################################
 if add_data:
-    assert(dataset=='robin')
-    print("Adding clean data from robin train!")
-    imgs2, labels2, masks2 = getImg('train', categories, 'robin', data_path, cat_test, \
-        occ_level, occ_type, bool_load_occ_mask=False)
+    # assert(dataset=='robin')
+    if dataset in ['robin']:
+        print("Adding clean data from robin train!")
+        imgs2, labels2, masks2 = getImg('train', categories, 'robin', data_path, cat_test, \
+            occ_level, occ_type, bool_load_occ_mask=False)
+    elif dataset in ['pascal3d+']:
+        imgs2, labels2, masks2 = getImg('train', categories, dataset, data_path, cat_test, \
+                occ_level, occ_type, bool_load_occ_mask=False, determinate=True, corruption=corr, \
+                    corr_bck=backgnd_corr)
     # temp_list = list(zip(imgs2, labels2, masks2))
     # sampled = random.sample(temp_list, int(min(len(imgs), len(imgs2))*frc))
     # imgs+=[i for (i,l,m) in sampled]
@@ -216,7 +254,7 @@ else:
         prev_p = pickle.load(fh)
     prev_pi = np.sum(prev_p, axis=0)/prev_p.shape[0]
     # model.fit_soft(features=feat_set, p=prev_p, mu=prev_mu, pi=prev_pi, kappa=vMF_kappa, max_it=150)
-    model.fit_map(feat_set, pre_mu=prev_mu, pre_pi=prev_pi, reg=0.5,kappa=vMF_kappa, max_it=300)
+    model.fit_map(feat_set, pre_mu=prev_mu, pre_pi=prev_pi, reg=0.,kappa=vMF_kappa, max_it=300)
     del(prev_p, prev_mu, prev_pi)
 
 if DA:
