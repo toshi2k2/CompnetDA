@@ -1,4 +1,4 @@
-# A Bayesian Approach to OOD Generalization in Real World Scenarios [ECCV-2022]
+# A Bayesian Approach to OOD Generalization in Real World Scenarios [CVPR-2023]
  
 ### Installation
 
