@@ -1,4 +1,6 @@
-# A Bayesian Approach to OOD Generalization in Real World Scenarios [CVPR-2023]
+# Official Implementation of "A Bayesian Approach to OOD Robustness in Image Classification" [CVPR-2024]
+ 	
+[![PWC](https://img.shields.io/endpoint.svg?url=https://paperswithcode.com/badge/a-bayesian-approach-to-ood-robustness-in/unsupervised-domain-adaptation-on-ood-cv)](https://paperswithcode.com/sota/unsupervised-domain-adaptation-on-ood-cv?p=a-bayesian-approach-to-ood-robustness-in)
  
 ### Installation
 
