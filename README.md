@@ -43,8 +43,8 @@ python Code/test.py
 ```
 # TODO
 
-- [x] Direct Trasitional Dictionary Learning
-- [ ] Regularized MLE 
+- [x] Direct Transitional vMF Dictionary Learning (No source domain data needed)
+- [ ] Regularized MLE (source domain data needed)
 - [ ] Other Backbones
       
 <!-- #### Evaluate the occluder localization performance of a model
