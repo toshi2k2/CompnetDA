@@ -41,7 +41,10 @@ A folder with the format models/vcvgg_tr_final/vc_{epoch-number}.pth will be cre
 ```
 python Code/test.py
 ```
-
+- [x] Direct Trasitional Dictionary Learning
+- [ ] Regularized MLE 
+- [ ] Other Backbones
+      
 <!-- #### Evaluate the occluder localization performance of a model
 
 If you want to test occluder localization run:
