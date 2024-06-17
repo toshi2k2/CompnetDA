@@ -12,7 +12,7 @@ The code has been tested on **Python 3.9** and PyTorch GPU version 1.10.1, with 
 cd CompDA
 ```
 
-Put data in data/OODCV folder and create a 'models' folder-
+Put data in data/Robin folder and create a 'models' folder-
 
 ```
 mkdir data && mkdir models && mkdir results && mkdir baseline_models
