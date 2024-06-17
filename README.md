@@ -6,52 +6,19 @@
 
 The code has been tested on **Python 3.9** and PyTorch GPU version 1.10.1, with CUDA-11.3.
 
-<!-- ### Setup CompNet Virtual Environment
-
-```
-virtualenv --no-site-packages <your_home_dir>/.virtualenvs/CompNet
-source <your_home_dir>/.virtualenvs/CompNet/bin/activate -->
-<!-- ``` -->
-
-<!-- ### Clone the project and install requirements
-
-```
-git clone https://github.com/AdamKortylewski/CompositionalNets.git
-cd CompositionalNets
-pip install -r requirements.txt
-``` -->
-
-<!-- ## Download models
-
-* Download pretrained CompNet weights from [here](https://livejohnshopkins-my.sharepoint.com/:u:/g/personal/akortyl1_jh_edu/EYH4UDvQnQ9Ettu7cBQAfZoBFLU0gZeredTmfUssMJCrKg?e=HqxXAs) and copy them inside the **models** folder.
-
-* The repositroy contains a few images for the demo script. If you want to evaluate on the full datasets used in our paper you need to download the data [here](https://livejohnshopkins-my.sharepoint.com/:u:/g/personal/akortyl1_jh_edu/ETsbJHY58hxDjjM-qL9KUU4BsTU1ZlieevTayqJPhFMj9Q?e=Mrf4LQ) and copy it inside the **data** folder. -->
-
-<!-- ## Demo
-
-CompNets require a tight crop of the object in the image. We provide sample images in the **demo** folder 
-which are taken from [MS-COCO](http://cocodataset.org/). -->
-
-<!-- #### Run the demo code
-```
-python Code/demo.py 
-```
-
-Our demo script classifies the images from the **demo** folder, extracts the predicted location of occluders, and writes the results back into the **demo** folder.
-  -->
 #### Quick Start
 
 ```
 cd CompDA
 ```
 
-Put data in data/Robin folder and create a 'models' folder-
+Put data in data/OODCV folder and create a 'models' folder-
 
 ```
 mkdir data && mkdir models && mkdir results && mkdir baseline_models
 ```
 
-First train/finetune a VGG16(BN) model on ROBIN training data (to be used as backbone) and save it as 
+First train/finetune a VGG16(BN) model on OODCV training data (to be used as backbone) and save it as 
 
 ```
 baseline_models/Robin-train-vgg_bn.pth
