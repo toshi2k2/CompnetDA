@@ -18,16 +18,16 @@ Put data in data/OODCV folder and create a 'models' folder-
 mkdir data && mkdir models && mkdir results && mkdir baseline_models
 ```
 
-First train/finetune a VGG16(BN) model on OODCV training data (to be used as backbone) and save it as 
+First train/finetune a VGG16(BN) model on OOD-CV(called ROBIN earlier) training data (to be used as backbone) and save it as 
 
 ```
 baseline_models/Robin-train-vgg_bn.pth
 ```
 
-To run and evaluate experiment for VGG16 on ROBIN dataset, run the following-
+To run and evaluate experiment for VGG16 on OOD-CV dataset, run the following-
 
 ```
-python Initialization_Code/vmf_cluster.py --da True --robin_cat None<0,1,2,3,4 for ROBIN subcategories> && python Initialization_Code/simmat.py --da True --mode 'mixed' && python Initialization_Code/Learn_mix_model_vMF_view.py --da True --mode 'mixed' && python Code/test.py --da True --bbone 'vgg_tr' --sveimglst True --load False && python Da/pseudo_data_creation.py
+python Initialization_Code/vmf_cluster.py --da True --robin_cat None<0,1,2,3,4 for OOD-CV subcategories> && python Initialization_Code/simmat.py --da True --mode 'mixed' && python Initialization_Code/Learn_mix_model_vMF_view.py --da True --mode 'mixed' && python Code/test.py --da True --bbone 'vgg_tr' --sveimglst True --load False && python Da/pseudo_data_creation.py
 ```
 
 Change dataset variable in Code/config.py and Initialization_Code/config_initialization.py from 'robin' to 'pseudorobin' and run-
